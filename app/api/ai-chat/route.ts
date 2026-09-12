@@ -1,134 +1,258 @@
-import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+"use client";
 
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const SUPABASE_KEY =
-  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+import React, { useState, useEffect, useRef } from "react";
+import { MessageSquare, Send, X, ShoppingCart, Bot, User, Check } from "lucide-react";
+import { supabase } from "@/lib/supabase";
 
-export async function POST(req: Request) {
-  try {
-    if (!GEMINI_API_KEY) {
-      return NextResponse.json(
-        { error: "مفتاح GEMINI_API_KEY غير متوفر في متغيرات البيئة." },
-        { status: 500 }
-      );
+type Message = {
+  id: string;
+  sender: "bot" | "user";
+  text: string;
+  products?: any[];
+};
+
+export default function AbuToqChatbot() {
+  const [isOpen, setIsOpen] = useState(false);
+  const [messages, setMessages] = useState<Message[]>([
+    {
+      id: "1",
+      sender: "bot",
+      text: "أهلاً وسهلاً فيك بمكتبة أبو طوق! كيف بقدر أساعدك اليوم؟",
+    },
+  ]);
+  const [inputText, setInputText] = useState("");
+  const [loading, setLoading] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  useEffect(() => {
+    if (isOpen) {
+      scrollToBottom();
     }
+  }, [messages, isOpen]);
 
-    if (!SUPABASE_URL || !SUPABASE_KEY) {
-      return NextResponse.json(
-        { error: "بيانات الاتصال بـ Supabase غير متوفرة في متغيرات البيئة." },
-        { status: 500 }
-      );
-    }
+  const handleSendMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!inputText.trim()) return;
 
-    const { messages } = await req.json();
+    const userText = inputText.trim();
+    const userMsgId = Date.now().toString();
 
-    if (!messages || !Array.isArray(messages)) {
-      return NextResponse.json(
-        { error: "الرسائل غير صحيحة أو غير متوفرة." },
-        { status: 400 }
-      );
-    }
+    setMessages((prev) => [...prev, { id: userMsgId, sender: "user", text: userText }]);
+    setInputText("");
+    setLoading(true);
 
-    const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
-    const { data: productsData, error: dbError } = await supabase
-      .from("products")
-      .select("*")
-      .order("created_at", { ascending: false });
+    try {
+      // فحص إذا كان الزبون قاعد بيمزح أو بيستهبل بسؤال ما له داعي
+      const lowercaseText = userText.toLowerCase();
+      const nonsenseWords = ["بطاطا", "تخوت", "سيارة", "طيارة", "هبل", "تاريخ الميلاد", "بحبك", "من وين أنت"];
+      const isNonsense = nonsenseWords.some((word) => lowercaseText.includes(word)) && !lowercaseText.includes("دوسية") && !lowercaseText.includes("قلم") && !lowercaseText.includes("كتاب");
 
-    if (dbError) {
-      console.error("Supabase Error:", dbError);
-      return NextResponse.json(
-        { error: `خطأ في استرجاع المنتجات: ${dbError.message}` },
-        { status: 500 }
-      );
-    }
-
-    const products = productsData || [];
-    let storeProductsText = "";
-
-    if (products.length === 0) {
-      storeProductsText = "لا توجد أي منتجات مضافة في المتجر حالياً.";
-    } else {
-      storeProductsText = products
-        .map((p, i) => {
-          const details = [
-            `الاسم: ${p.title || "بدون اسم"}`,
-            `السعر: ${
-              p.price !== null && p.price !== undefined
-                ? `${p.price} د.أ`
-                : "غير محدد"
-            }`,
-            `القسم: ${p.category || "عام"}`,
-          ];
-          if (p.subject) details.push(`المادة: ${p.subject}`);
-          if (p.year) details.push(`الجيل: ${p.year}`);
-          if (p.semester) details.push(`الفصل: ${p.semester}`);
-          if (p.dossier_type) details.push(`النوع: ${p.dossier_type}`);
-          return `[${i + 1}] ${details.join(" | ")}`;
-        })
-        .join("\n");
-    }
-
-    const formattedMessages = messages.map(
-      (m: { role: string; content: string }) => ({
-        role: m.role === "assistant" ? "model" : "user",
-        parts: [{ text: m.content }],
-      })
-    );
-
-    const response = await fetch(
-      "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-goog-api-key": GEMINI_API_KEY,
-        },
-        body: JSON.stringify({
-          systemInstruction: {
-            parts: [
-              {
-                text: `أنت مساعد زبائن ذكي ومروح ولطيف جداً في مكتبة أبو طوق بالأردن، أسلوبك كأنك زلمة رايق، مرح، بتضحك ومبسوط وبتحكي باللهجة الأردنية الأصلية وبترحيب عالي.
-
-قواعد التعامل مع الزبائن:
-1. الأسئلة التوضيحية: إذا طلب الزبون طلباً عاماً (مثل دوسية رياضيات) ولم يحدد هل هي للمادة كاملة أو مكثف ولأي فصل، اسأله بأسلوب لطيف ومرح: "يا هلا! من عيوني الثنتين، بس قولي بدك إياها للمادة كاملة ولا مكثف؟ ولأي فصل عشان أجيبلكياها على الإبرة؟".
-2. التطابق والتوافر: إذا وجد المنتج بدقة في القائمة المرفقة، جاوبه بفرح ووضح له اسمه وسعره بلهجة أردنية أصيلة.
-3. عدم التوافر: إذا لم تجد المنتج، قل له بأسلوب مرح: "يا غالي للأسف مش موجودة هسا بالمكتبة، بس تكرم عينك أول ما توفر بنجيبها!".
-4. ممنوع التخمين نهائياً، واعتمد حصراً على القائمة.
-
-قائمة المنتجات المتوفرة حالياً:
-${storeProductsText}`,
-              },
-            ],
+      if (isNonsense) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: (Date.now() + 1).toString(),
+            sender: "bot",
+            text: "أنت جاي تمزح معي ولا جاي تشتري؟ اخلص شو بدك من المكتبة؟",
           },
-          contents: formattedMessages,
-        }),
+        ]);
+        setLoading(false);
+        return;
       }
-    );
 
-    const data = await response.json();
+      // البحث عن المنتجات المطلوبة في قاعدة البيانات (Supabase)
+      const { data: products, error } = await supabase
+        .from("products")
+        .select("*")
+        .ilike("title", `%${userText}%`)
+        .limit(3);
 
-    if (!response.ok) {
-      console.error("Gemini API Error:", data);
-      return NextResponse.json(
-        { error: data?.error?.message || "خطأ في الاتصال" },
-        { status: response.status }
-      );
+      if (error) {
+        console.error("Chat search error:", error);
+      }
+
+      if (products && products.length > 0) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: (Date.now() + 1).toString(),
+            sender: "bot",
+            text: "تفضل يا غالي، لقيت لك هاد الطلب:",
+            products: products,
+          },
+        ]);
+      } else {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: (Date.now() + 1).toString(),
+            sender: "bot",
+            text: "والله يا اخوي ما لقيت اشي بهذا الاسم عندي بالمكتبة، جرب اطلب اشي تاني.",
+          },
+        ]);
+      }
+    } catch (err) {
+      console.error(err);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: (Date.now() + 1).toString(),
+          sender: "bot",
+          text: "صار في خطأ صغير، رجع اطلب كمان مرة يا وحش.",
+        },
+      ]);
+    } finally {
+      setLoading(false);
     }
+  };
 
-    const reply =
-      data?.candidates?.[0]?.content?.parts?.[0]?.text ||
-      "يا هلا فيك يا غالي، كيف بقدر أخدمك اليوم؟";
+  const addToCartFromChat = (product: any) => {
+    try {
+      const existingCart = localStorage.getItem("abutoq_cart");
+      let cart = existingCart ? JSON.parse(existingCart) : [];
+      const index = cart.findIndex((item: any) => item.id === product.id);
 
-    return NextResponse.json({ reply, products });
-  } catch (error: any) {
-    console.error("Server Error:", error);
-    return NextResponse.json(
-      { error: error?.message || "حدث خطأ غير متوقع" },
-      { status: 500 }
-    );
-  }
+      if (index > -1) {
+        cart[index].quantity += 1;
+      } else {
+        cart.push({
+          id: product.id,
+          name: product.title,
+          price: product.price,
+          image: product.image,
+          quantity: 1,
+        });
+      }
+
+      localStorage.setItem("abutoq_cart", JSON.stringify(cart));
+      window.dispatchEvent(new Event("storage"));
+      alert(`تم إضافة "${product.title}" لسلتك يا غالي! 🛒`);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  return (
+    <div className="fixed bottom-6 left-6 z-50">
+      {!isOpen ? (
+        <button
+          onClick={() => setIsOpen(true)}
+          className="w-14 h-14 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-2xl flex items-center justify-center transition hover:scale-105"
+          title="مساعد مكتبة أبو طوق"
+        >
+          <Bot className="w-7 h-7" />
+        </button>
+      ) : (
+        <div className="bg-white border border-blue-100 rounded-3xl shadow-2xl w-[90vw] sm:w-[380px] h-[500px] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
+          {/* رأس الشات */}
+          <div className="bg-blue-600 text-white p-4 flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center">
+                <Bot className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <h3 className="font-black text-sm">مساعد أبو طوق</h3>
+                <span className="text-[10px] text-blue-100 flex items-center gap-1">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                  جاهز لخدمتك
+                </span>
+              </div>
+            </div>
+            <button
+              onClick={() => setIsOpen(false)}
+              className="p-1.5 rounded-full hover:bg-white/10 text-white transition"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          {/* محتوى الرسائل */}
+          <div className="flex-1 p-4 overflow-y-auto space-y-3 bg-slate-50 text-xs">
+            {messages.map((msg) => (
+              <div
+                key={msg.id}
+                className={`flex flex-col ${msg.sender === "user" ? "items-end" : "items-start"}`}
+              >
+                <div
+                  className={`p-3 rounded-2xl max-w-[85%] font-medium leading-relaxed ${
+                    msg.sender === "user"
+                      ? "bg-blue-600 text-white rounded-bl-none"
+                      : "bg-white text-slate-800 border border-slate-200 rounded-br-none shadow-sm"
+                  }`}
+                >
+                  {msg.text}
+                </div>
+
+                {/* عرض المنتجات إن وجدت مع كبسة الإضافة للسلة */}
+                {msg.products && msg.products.length > 0 && (
+                  <div className="mt-2 space-y-2 w-full">
+                    {msg.products.map((product) => (
+                      <div
+                        key={product.id}
+                        className="bg-white border border-blue-100 rounded-2xl p-2.5 shadow-sm flex items-center gap-3"
+                      >
+                        {product.image ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={product.image}
+                            alt={product.title}
+                            className="w-12 h-12 object-cover rounded-xl border border-slate-100 shrink-0"
+                          />
+                        ) : (
+                          <div className="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center shrink-0">
+                            <ShoppingCart className="w-5 h-5 text-slate-400" />
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <p className="font-bold text-blue-950 truncate">{product.title}</p>
+                          <p className="text-emerald-600 font-black mt-0.5">{product.price} د.أ</p>
+                        </div>
+                        <button
+                          onClick={() => addToCartFromChat(product)}
+                          className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-[11px] shrink-0 shadow-sm transition flex items-center gap-1"
+                        >
+                          <ShoppingCart className="w-3.5 h-3.5" />
+                          <span>أضف</span>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+
+            {loading && (
+              <div className="flex items-center gap-1.5 text-slate-400 p-2">
+                <span className="w-2 h-2 bg-blue-600 rounded-full animate-bounce"></span>
+                <span className="w-2 h-2 bg-blue-600 rounded-full animate-bounce [animation-delay:0.2s]"></span>
+                <span className="w-2 h-2 bg-blue-600 rounded-full animate-bounce [animation-delay:0.4s]"></span>
+              </div>
+            )}
+            <div ref={messagesEndRef} />
+          </div>
+
+          {/* صندوق الكتابة */}
+          <form onSubmit={handleSendMessage} className="p-3 bg-white border-t border-slate-100 flex items-center gap-2">
+            <input
+              type="text"
+              value={inputText}
+              onChange={(e) => setInputText(e.target.value)}
+              placeholder="اكتب طلبك هون..."
+              className="flex-1 p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 outline-none focus:border-blue-600"
+            />
+            <button
+              type="submit"
+              className="p-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl transition shadow-sm"
+            >
+              <Send className="w-4 h-4 rotate-180" />
+            </button>
+          </form>
+        </div>
+      )}
+    </div>
+  );
 }
