@@ -195,7 +195,6 @@ export default function DashboardPage() {
     }
   };
 
-  // دالة مخصصة لجلب المنتجات فقط عند الطلب اليدوي
   const loadProductsOnly = async () => {
     setLoadingProducts(true);
     try {
@@ -226,7 +225,6 @@ export default function DashboardPage() {
     }
   };
 
-  // دالة مخصصة لجلب الطلبات (تُستدعى دورياً كل 3 دقائق)
   const loadOrdersOnly = async (silent = false) => {
     if (!silent) setLoadingOrders(true);
     try {
@@ -278,7 +276,6 @@ export default function DashboardPage() {
     }
   };
 
-  // تحميل أولي للبيانات عند تسجيل الدخول
   useEffect(() => {
     if (!isAuthenticated) return;
 
@@ -287,7 +284,6 @@ export default function DashboardPage() {
     loadOrdersOnly(false);
   }, [isAuthenticated]);
 
-  // تحديث الطلبات فقط كل 3 دقائق (180000ms)
   useEffect(() => {
     if (!isAuthenticated) return;
 
@@ -528,7 +524,6 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800">
-      {/* إشعار الطلب الجديد */}
       {notification && (
         <div className="fixed top-5 left-1/2 -translate-x-1/2 z-[100] w-[calc(100%-32px)] max-w-md">
           <div className="bg-white border-2 border-blue-500 rounded-2xl shadow-2xl p-4 flex items-center gap-3 animate-in slide-in-from-top duration-300">
@@ -563,7 +558,6 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* الرأس */}
       <header className="sticky top-0 z-40 backdrop-blur-md bg-white/85 border-b border-blue-100 shadow-sm">
         <div className="max-w-6xl mx-auto px-6 h-20 flex items-center justify-between">
           <div className="flex items-center gap-4">
@@ -581,7 +575,6 @@ export default function DashboardPage() {
         </div>
       </header>
 
-      {/* التبويبات */}
       <div className="max-w-6xl mx-auto px-6 mt-6">
         <div className="grid grid-cols-3 gap-4">
           <button
@@ -631,7 +624,6 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* شريط البحث */}
       <div className="max-w-6xl mx-auto px-6 mt-5">
         <div className="relative">
           <input
@@ -660,7 +652,6 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* المحتوى الرئيسي */}
       <main className="max-w-6xl mx-auto px-6 py-8">
         {activeTab === "orders" ? (
           <div className="space-y-6">
@@ -840,265 +831,231 @@ export default function DashboardPage() {
             )}
           </div>
         ) : (
-          /* تبويب الدوسيات والقرطاسية - تحديث يدوي فقط */
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <div className="bg-white border border-blue-100 rounded-3xl p-6 shadow-sm h-fit">
-              <h2 className="text-lg font-black text-blue-950 mb-4 flex items-center gap-2">
+            <div className="lg:col-span-1 bg-white border border-blue-100 rounded-3xl p-6 shadow-sm space-y-6 h-fit">
+              <h2 className="text-lg font-black text-blue-950 flex items-center gap-2">
                 <PlusCircle className="w-5 h-5 text-blue-600" />
-                {activeTab === "dossiers" ? "إضافة دوسية" : "إضافة منتج"}
+                <span>{activeTab === "dossiers" ? "إضافة دوسية جديدة" : "إضافة منتج جديد"}</span>
               </h2>
 
               <form onSubmit={handleAddItem} className="space-y-4">
-                {activeTab === "stationery" && (
-                  <div>
-                    <label className="block text-xs font-bold text-slate-600 mb-2">اختر القسم</label>
-                    <div className="grid grid-cols-3 gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setCategoryType("قرطاسية")}
-                        className={`p-3 rounded-xl border text-xs font-black flex flex-col items-center justify-center gap-1.5 transition ${
-                          categoryType === "قرطاسية"
-                            ? "bg-blue-600 text-white border-blue-600"
-                            : "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100"
-                        }`}
-                      >
-                        <ShoppingBag className="w-4 h-4" />
-                        <span>قرطاسية</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setCategoryType("أدوات")}
-                        className={`p-3 rounded-xl border text-xs font-black flex flex-col items-center justify-center gap-1.5 transition ${
-                          categoryType === "أدوات"
-                            ? "bg-orange-500 text-white border-orange-500"
-                            : "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100"
-                        }`}
-                      >
-                        <Wrench className="w-4 h-4" />
-                        <span>أدوات</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setCategoryType("ألعاب")}
-                        className={`p-3 rounded-xl border text-xs font-black flex flex-col items-center justify-center gap-1.5 transition ${
-                          categoryType === "ألعاب"
-                            ? "bg-emerald-600 text-white border-emerald-600"
-                            : "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100"
-                        }`}
-                      >
-                        <Gamepad2 className="w-4 h-4" />
-                        <span>ألعاب</span>
-                      </button>
-                    </div>
-                  </div>
-                )}
-
                 <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1">اسم العنصر</label>
+                  <label className="block text-xs font-black text-slate-600 mb-1">اسم العنصر</label>
                   <input
-                    required
                     type="text"
-                    placeholder={activeTab === "dossiers" ? "اكتب اسم الدوسية..." : "اكتب اسم المنتج..."}
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
-                    className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 outline-none focus:border-blue-600"
+                    placeholder={activeTab === "dossiers" ? "مثال: دوسية التفاضل والتكامل" : "مثال: دفتر ملاحظات 200 ورقة"}
+                    className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 outline-none focus:border-blue-500"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1">السعر (دينار)</label>
+                  <label className="block text-xs font-black text-slate-600 mb-1">السعر (د.أ)</label>
                   <input
-                    required
                     type="number"
-                    step="0.5"
-                    min="0"
-                    placeholder="3.00"
+                    step="0.01"
                     value={price}
                     onChange={(e) => setPrice(e.target.value)}
-                    className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 outline-none focus:border-blue-600"
+                    placeholder="مثال: 3.50"
+                    className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 outline-none focus:border-blue-500"
                   />
                 </div>
 
-                {activeTab === "dossiers" && (
+                {activeTab === "dossiers" ? (
                   <>
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <label className="block text-xs font-bold text-slate-600 mb-1">الجيل</label>
-                        <select
-                          value={year}
-                          onChange={(e) => setYear(e.target.value)}
-                          className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-900"
-                        >
-                          <option value="2010">جيل 2010</option>
-                          <option value="2009">جيل 2009</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-xs font-bold text-slate-600 mb-1">الفصل</label>
-                        <select
-                          value={semester}
-                          onChange={(e) => setSemester(e.target.value)}
-                          className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-900"
-                        >
-                          <option value="الأول">الأول</option>
-                          <option value="الثاني">الثاني</option>
-                        </select>
-                      </div>
-                    </div>
-
                     <div>
-                      <label className="block text-xs font-bold text-slate-600 mb-1">المادة</label>
+                      <label className="block text-xs font-black text-slate-600 mb-1">الجيل / سنة الدراسة</label>
                       <select
-                        value={subject}
-                        onChange={(e) => setSubject(e.target.value)}
-                        className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-900"
+                        value={year}
+                        onChange={(e) => setYear(e.target.value)}
+                        className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 outline-none focus:border-blue-500"
                       >
-                        <option value="الرياضيات">الرياضيات</option>
-                        <option value="اللغة العربية">اللغة العربية</option>
-                        <option value="اللغة الإنجليزية">اللغة الإنجليزية</option>
-                        <option value="التربية الإسلامية">التربية الإسلامية</option>
-                        <option value="تاريخ الأردن">تاريخ الأردن</option>
+                        <option value="2010">جيل 2010</option>
+                        <option value="2009">جيل 2009</option>
+                        <option value="2008">جيل 2008</option>
+                        <option value="توجيهي سابق">توجيهي سابق</option>
                       </select>
                     </div>
 
                     <div>
-                      <label className="block text-xs font-bold text-slate-600 mb-2">نوع الدوسية</label>
-                      <div className="grid grid-cols-3 gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setDossierType("مادة")}
-                          className={`p-3 rounded-xl border text-xs font-black flex flex-col items-center justify-center gap-1.5 transition ${
-                            dossierType === "مادة"
-                              ? "bg-blue-600 text-white border-blue-600"
-                              : "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100"
-                          }`}
-                        >
-                          <BookOpen className="w-4 h-4" />
-                          <span>مادة</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setDossierType("مكثف")}
-                          className={`p-3 rounded-xl border text-xs font-black flex flex-col items-center justify-center gap-1.5 transition ${
-                            dossierType === "مكثف"
-                              ? "bg-purple-600 text-white border-purple-600"
-                              : "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100"
-                          }`}
-                        >
-                          <FileText className="w-4 h-4" />
-                          <span>مكثف</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setDossierType("بنك أسئلة")}
-                          className={`p-3 rounded-xl border text-xs font-black flex flex-col items-center justify-center gap-1.5 transition ${
-                            dossierType === "بنك أسئلة"
-                              ? "bg-emerald-600 text-white border-emerald-600"
-                              : "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100"
-                          }`}
-                        >
-                          <ClipboardList className="w-4 h-4" />
-                          <span>بنك أسئلة</span>
-                        </button>
-                      </div>
+                      <label className="block text-xs font-black text-slate-600 mb-1">الفصل الدراسي</label>
+                      <select
+                        value={semester}
+                        onChange={(e) => setSemester(e.target.value)}
+                        className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 outline-none focus:border-blue-500"
+                      >
+                        <option value="الأول">الفصل الأول</option>
+                        <option value="الثاني">الفصل الثاني</option>
+                        <option value="الفصلين">الفصلين معاً</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-black text-slate-600 mb-1">المادة الدراسية</label>
+                      <select
+                        value={subject}
+                        onChange={(e) => setSubject(e.target.value)}
+                        className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 outline-none focus:border-blue-500"
+                      >
+                        <option value="الرياضيات">الرياضيات</option>
+                        <option value="الفيزياء">الفيزياء</option>
+                        <option value="الكيمياء">الكيمياء</option>
+                        <option value="الأحياء">الأحياء</option>
+                        <option value="اللغة العربية">اللغة العربية</option>
+                        <option value="اللغة الإنجليزية">اللغة الإنجليزية</option>
+                        <option value="التربية الإسلامية">التربية الإسلامية</option>
+                        <option value="تاريخ العرب">تاريخ العرب</option>
+                        <option value="الحاسوب">الحاسوب</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-black text-slate-600 mb-1">نوع الدوسية</label>
+                      <select
+                        value={dossierType}
+                        onChange={(e) => setDossierType(e.target.value as DossierType)}
+                        className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 outline-none focus:border-blue-500"
+                      >
+                        <option value="مادة">مادة أساسية</option>
+                        <option value="مكثف">مكثف نهائي</option>
+                        <option value="بنك أسئلة">بنك أسئلة واختبارات</option>
+                      </select>
                     </div>
                   </>
+                ) : (
+                  <div>
+                    <label className="block text-xs font-black text-slate-600 mb-1">تصنيف المنتج</label>
+                    <select
+                      value={categoryType}
+                      onChange={(e) => setCategoryType(e.target.value as StationeryCategory)}
+                      className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 outline-none focus:border-blue-500"
+                    >
+                      <option value="قرطاسية">قرطاسية</option>
+                      <option value="أدوات">أدوات مدرسية وفنية</option>
+                      <option value="ألعاب">ألعاب وأنشطة ذكاء</option>
+                    </select>
+                  </div>
                 )}
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1">صورة الغلاف / المنتج</label>
-                  <label className="flex items-center justify-center gap-2 p-3 bg-blue-50 border border-dashed border-blue-300 rounded-xl cursor-pointer hover:bg-blue-100 transition text-blue-800 text-xs font-bold">
-                    <Upload className="w-4 h-4" />
-                    <span>اختر صورة من الجهاز</span>
-                    <input type="file" accept="image/*" onChange={handleImageChange} className="hidden" />
-                  </label>
-                  {imagePreview && (
-                    <div className="mt-3">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={imagePreview}
-                        alt="معاينة"
-                        className="w-full h-40 object-cover rounded-xl border border-slate-200"
-                      />
-                    </div>
-                  )}
+                  <label className="block text-xs font-black text-slate-600 mb-1">صورة المنتج</label>
+                  <div className="flex items-center gap-3">
+                    <label className="flex-1 cursor-pointer bg-slate-50 border border-dashed border-slate-300 hover:border-blue-500 rounded-xl p-3 text-center transition">
+                      <span className="text-xs font-bold text-slate-500 flex items-center justify-center gap-1.5">
+                        <Upload className="w-4 h-4 text-blue-600" />
+                        اختر صورة
+                      </span>
+                      <input type="file" accept="image/*" onChange={handleImageChange} className="hidden" />
+                    </label>
+                    {imagePreview && (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={imagePreview} alt="معاينة" className="w-12 h-12 object-cover rounded-xl border border-slate-200" />
+                    )}
+                  </div>
                 </div>
 
                 <button
                   type="submit"
                   disabled={loadingProducts}
-                  className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold rounded-xl text-sm transition shadow-sm"
+                  className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs transition shadow-sm disabled:opacity-50"
                 >
-                  {loadingProducts ? "جاري الحفظ..." : "حفظ ونشر في المتجر"}
+                  {loadingProducts ? "جاري الحفظ..." : "حفظ ونشر العنصر"}
                 </button>
               </form>
             </div>
 
-            {/* قائمة العناصر */}
             <div className="lg:col-span-2 space-y-4">
-              <div className="bg-white border border-blue-100 rounded-3xl p-6 shadow-sm">
-                <div className="flex items-center justify-between gap-3 mb-4">
-                  <h2 className="text-lg font-black text-blue-950">
-                    {activeTab === "dossiers"
-                      ? `قائمة الدوسيات (${filteredDossiers.length})`
-                      : `قائمة المنتجات (${filteredStationery.length})`}
-                  </h2>
-                  <button
-                    onClick={() => loadProductsOnly()}
-                    disabled={loadingProducts}
-                    className="text-xs bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-lg font-bold hover:bg-slate-100 transition disabled:opacity-50"
-                  >
-                    {loadingProducts ? "جاري التحديث..." : "تحديث القائمة"}
-                  </button>
-                </div>
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-black text-blue-950">
+                  {activeTab === "dossiers" ? `الدوسيات المتاحة (${filteredDossiers.length})` : `القرطاسية والأدوات (${filteredStationery.length})`}
+                </h2>
+              </div>
 
-                {(activeTab === "dossiers" ? filteredDossiers : filteredStationery).length === 0 ? (
-                  <div className="text-center py-8">
-                    <p className="text-xs text-slate-400">
-                      {searchQuery ? "لا توجد نتائج مطابقة لبحثك." : "لا توجد عناصر مضافة بعد."}
-                    </p>
+              {activeTab === "dossiers" ? (
+                filteredDossiers.length === 0 ? (
+                  <div className="bg-white border border-blue-100 rounded-3xl p-12 text-center shadow-sm">
+                    <BookOpen className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+                    <p className="text-sm font-bold text-slate-500">لا توجد دوسيات مضافة حالياً</p>
                   </div>
                 ) : (
-                  <div className="space-y-3">
-                    {(activeTab === "dossiers" ? filteredDossiers : filteredStationery).map((item: any) => (
-                      <div
-                        key={item.id}
-                        className="p-4 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-between gap-4"
-                      >
-                        <div className="flex items-center gap-3 min-w-0">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {filteredDossiers.map((item) => (
+                      <div key={item.id} className="bg-white border border-blue-100 rounded-2xl p-4 shadow-sm space-y-3 flex flex-col justify-between">
+                        <div className="flex items-start gap-3">
                           {item.image ? (
                             // eslint-disable-next-line @next/next/no-img-element
-                            <img
-                              src={item.image}
-                              alt={item.title}
-                              className="w-14 h-14 object-cover rounded-xl border border-slate-200 shrink-0"
-                            />
+                            <img src={item.image} alt={item.title} className="w-16 h-16 object-cover rounded-xl border border-slate-100" />
                           ) : (
-                            <div className="w-14 h-14 rounded-xl bg-slate-200 flex items-center justify-center shrink-0">
-                              <ShoppingBag className="w-5 h-5 text-slate-400" />
+                            <div className="w-16 h-16 rounded-xl bg-slate-100 flex items-center justify-center">
+                              <BookOpen className="w-6 h-6 text-slate-400" />
                             </div>
                           )}
-                          <div className="min-w-0">
-                            <h3 className="font-bold text-blue-950 text-sm truncate">{item.title}</h3>
-                            <p className="text-xs text-blue-700 font-bold mt-0.5">
-                              {Number(item.price || 0).toFixed(2)} دينار
-                            </p>
+                          <div className="flex-1 min-w-0">
+                            <span className="bg-blue-50 text-blue-700 text-[10px] font-black px-2 py-0.5 rounded">
+                              {item.dossier_type || "دوسية"}
+                            </span>
+                            <h3 className="font-bold text-sm text-blue-950 truncate mt-1">{item.title}</h3>
+                            <p className="text-xs text-slate-500 mt-0.5">{item.subject} - جيل {item.year}</p>
                           </div>
                         </div>
-                        <button
-                          onClick={() =>
-                            handleDelete(item.id, activeTab === "dossiers" ? "dossiers" : "stationery")
-                          }
-                          className="p-2.5 text-rose-500 hover:bg-rose-50 rounded-xl border border-rose-100 bg-white shrink-0"
-                          title="حذف نهائي"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+
+                        <div className="flex items-center justify-between pt-3 border-t border-slate-100">
+                          <span className="font-black text-emerald-600 text-sm">{item.price} د.أ</span>
+                          <button
+                            onClick={() => handleDelete(item.id, "dossiers")}
+                            className="p-2 text-rose-500 hover:bg-rose-50 rounded-xl transition"
+                            title="حذف"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>
-                )}
-              </div>
+                )
+              ) : (
+                filteredStationery.length === 0 ? (
+                  <div className="bg-white border border-blue-100 rounded-3xl p-12 text-center shadow-sm">
+                    <ShoppingBag className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+                    <p className="text-sm font-bold text-slate-500">لا توجد منتجات قرطاسية مضافة حالياً</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {filteredStationery.map((item) => (
+                      <div key={item.id} className="bg-white border border-blue-100 rounded-2xl p-4 shadow-sm space-y-3 flex flex-col justify-between">
+                        <div className="flex items-start gap-3">
+                          {item.image ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={item.image} alt={item.title} className="w-16 h-16 object-cover rounded-xl border border-slate-100" />
+                          ) : (
+                            <div className="w-16 h-16 rounded-xl bg-slate-100 flex items-center justify-center">
+                              <ShoppingBag className="w-6 h-6 text-slate-400" />
+                            </div>
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <span className="bg-purple-50 text-purple-700 text-[10px] font-black px-2 py-0.5 rounded">
+                              {item.category || "قرطاسية"}
+                            </span>
+                            <h3 className="font-bold text-sm text-blue-950 truncate mt-1">{item.title}</h3>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between pt-3 border-t border-slate-100">
+                          <span className="font-black text-emerald-600 text-sm">{item.price} د.أ</span>
+                          <button
+                            onClick={() => handleDelete(item.id, "stationery")}
+                            className="p-2 text-rose-500 hover:bg-rose-50 rounded-xl transition"
+                            title="حذف"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )
+              )}
             </div>
           </div>
         )}
