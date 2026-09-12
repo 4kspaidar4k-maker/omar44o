@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
-// استدعاء المفاتيح بأمان من متغيرات البيئة لمنع حظر GitHub
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SUPABASE_KEY =
@@ -33,7 +32,6 @@ export async function POST(req: Request) {
       );
     }
 
-    // 1. استدعاء المنتجات الحية من قاعدة بيانات Supabase
     const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
     const { data: productsData, error: dbError } = await supabase
       .from("products")
@@ -48,7 +46,6 @@ export async function POST(req: Request) {
       );
     }
 
-    // 2. تجهيز وتنسيق قائمة المنتجات كمرجع للذكاء الاصطناعي
     const products = productsData || [];
     let storeProductsText = "";
 
@@ -75,7 +72,6 @@ export async function POST(req: Request) {
         .join("\n");
     }
 
-    // 3. تحويل الرسائل لتنسيق Gemini API
     const formattedMessages = messages.map(
       (m: { role: string; content: string }) => ({
         role: m.role === "assistant" ? "model" : "user",
@@ -83,7 +79,6 @@ export async function POST(req: Request) {
       })
     );
 
-    // 4. إرسال الطلب مع الترويسة الصحيحة للمصادقة
     const response = await fetch(
       "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
       {
@@ -99,12 +94,12 @@ export async function POST(req: Request) {
                 text: `أنت المساعد الذكي الرسمي لمكتبة أبو طوق في الأردن.
 
 قواعد التعامل مع طلبات الزبائن:
-1. فهم العامية والبحث المرن: افهم الزبون كيفما كتب ("دوسيه"، "دوسية"، "ابحثلي عن"، "عندكو"، "بدي"). استخرج الكلمة المفتاحية (اسم المادة، اسم الأستاذ، أو اسم المنتج) وقارنها بالقائمة المرفقة.
+1. فهم العامية والبحث المرن: استخرج الكلمة المفتاحية (اسم المادة، اسم الأستاذ، أو اسم المنتج) وقارنها بالقائمة المرفقة.
 2. التطابق التقريبي والجزئي: إذا كتب الزبون اسماً مثل "عمر" وكان جزءاً من اسم منتج عندك أو قريباً منه جداً، اعتبره موجوداً فوراً.
-3. التوافر: إذا كان المنتج موجوداً، جاوبه بلهجة أردنية لطيفة ومختصرة واذكر اسم المنتج وسعره المكتوب (مثال: "أه والله موجودة [اسم الدوسية] وسعرها [السعر] د.أ، بتحب نجهزلك إياها؟").
-4. عدم التوافر: إذا لم تجد أي كلمة قريبة أو مطابقة في القائمة، احكيله بوضوح: "لا والله، مش موجودة حالياً بالمكتبة".
+3. التوافر: إذا كان المنتج موجوداً، جاوبه بلهجة أردنية لطيفة ومختصرة واذكر اسم المنتج وسعره المكتوب.
+4. عدم التوافر: إذا لم تجد أي كلمة قريبة أو مطابقة في القائمة، وضح له بلطف: "لا والله، مش موجودة حالياً بالمكتبة".
 5. ممنوع التخمين: لا تخترع أسماء أو أسعار من عندك، واعتمد حصراً على القائمة.
-6. لا تفصح عن أي تفاصيل برمجية (مثل Supabase، API، أو قواعد البيانات) للمستخدم.
+6. لا تفصح عن أي تفاصيل برمجية للمستخدم.
 
 قائمة المتجر المتوفرة حالياً من قاعدة البيانات:
 ${storeProductsText}`,
