@@ -77,7 +77,27 @@ export default function DashboardPage() {
 
   const [year, setYear] = useState("2010");
   const [semester, setSemester] = useState("الأول");
-  const [subject, setSubject] = useState("الرياضيات");
+  const [subject, setSubject] = useState("عربي");
+
+  const subjectsByYear: Record<string, string[]> = {
+    "2009": [
+      "فيزياء",
+      "كيمياء",
+      "علوم أرض",
+      "أحياء",
+      "علوم حياتية",
+      "إنجليزي",
+      "رياضيات أعمال",
+      "رياضيات متقدمة",
+      "عربي",
+    ],
+    "2010": [
+      "عربي",
+      "رياضيات",
+      "دين",
+      "تاريخ",
+    ],
+  };
   const [dossierType, setDossierType] = useState<DossierType>("مادة");
 
   const [categoryType, setCategoryType] = useState<StationeryCategory>("قرطاسية");
@@ -868,13 +888,20 @@ export default function DashboardPage() {
                       <label className="block text-xs font-black text-slate-600 mb-1">الجيل / سنة الدراسة</label>
                       <select
                         value={year}
-                        onChange={(e) => setYear(e.target.value)}
+                        onChange={(e) => {
+                          const newYear = e.target.value;
+                          setYear(newYear);
+
+                          const availableSubjects = subjectsByYear[newYear] || [];
+
+                          if (availableSubjects.length > 0) {
+                            setSubject(availableSubjects[0]);
+                          }
+                        }}
                         className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 outline-none focus:border-blue-500"
                       >
                         <option value="2010">جيل 2010</option>
                         <option value="2009">جيل 2009</option>
-                        <option value="2008">جيل 2008</option>
-                        <option value="توجيهي سابق">توجيهي سابق</option>
                       </select>
                     </div>
 
@@ -898,15 +925,11 @@ export default function DashboardPage() {
                         onChange={(e) => setSubject(e.target.value)}
                         className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 outline-none focus:border-blue-500"
                       >
-                        <option value="الرياضيات">الرياضيات</option>
-                        <option value="الفيزياء">الفيزياء</option>
-                        <option value="الكيمياء">الكيمياء</option>
-                        <option value="الأحياء">الأحياء</option>
-                        <option value="اللغة العربية">اللغة العربية</option>
-                        <option value="اللغة الإنجليزية">اللغة الإنجليزية</option>
-                        <option value="التربية الإسلامية">التربية الإسلامية</option>
-                        <option value="تاريخ العرب">تاريخ العرب</option>
-                        <option value="الحاسوب">الحاسوب</option>
+                        {(subjectsByYear[year] || []).map((subjectName) => (
+                          <option key={subjectName} value={subjectName}>
+                            {subjectName}
+                          </option>
+                        ))}
                       </select>
                     </div>
 
