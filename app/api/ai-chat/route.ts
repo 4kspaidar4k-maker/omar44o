@@ -1,4 +1,4 @@
-"use client";
+"use "client";
 
 import React, { useState, useEffect, useRef } from "react";
 import { MessageSquare, Send, X, ShoppingCart, Bot, User, Check } from "lucide-react";
@@ -17,7 +17,7 @@ export default function AbuToqChatbot() {
     {
       id: "1",
       sender: "bot",
-      text: "أهلاً وسهلاً فيك بمكتبة أبو طوق! كيف بقدر أساعدك اليوم؟",
+      text: "أهلاً، تفضل شو بتطلب؟",
     },
   ]);
   const [inputText, setInputText] = useState("");
@@ -46,7 +46,6 @@ export default function AbuToqChatbot() {
     setLoading(true);
 
     try {
-      // فحص إذا كان الزبون قاعد بيمزح أو بيستهبل بسؤال ما له داعي
       const lowercaseText = userText.toLowerCase();
       const nonsenseWords = ["بطاطا", "تخوت", "سيارة", "طيارة", "هبل", "تاريخ الميلاد", "بحبك", "من وين أنت"];
       const isNonsense = nonsenseWords.some((word) => lowercaseText.includes(word)) && !lowercaseText.includes("دوسية") && !lowercaseText.includes("قلم") && !lowercaseText.includes("كتاب");
@@ -57,14 +56,13 @@ export default function AbuToqChatbot() {
           {
             id: (Date.now() + 1).toString(),
             sender: "bot",
-            text: "أنت جاي تمزح معي ولا جاي تشتري؟ اخلص شو بدك من المكتبة؟",
+            text: "هاد مش متوفر، اطلب اشي من المكتبة لو سمحت.",
           },
         ]);
         setLoading(false);
         return;
       }
 
-      // البحث عن المنتجات المطلوبة في قاعدة البيانات (Supabase)
       const { data: products, error } = await supabase
         .from("products")
         .select("*")
@@ -81,7 +79,7 @@ export default function AbuToqChatbot() {
           {
             id: (Date.now() + 1).toString(),
             sender: "bot",
-            text: "تفضل يا غالي، لقيت لك هاد الطلب:",
+            text: "هاد اللي لقيته:",
             products: products,
           },
         ]);
@@ -91,7 +89,7 @@ export default function AbuToqChatbot() {
           {
             id: (Date.now() + 1).toString(),
             sender: "bot",
-            text: "والله يا اخوي ما لقيت اشي بهذا الاسم عندي بالمكتبة، جرب اطلب اشي تاني.",
+            text: "مش موجود عندي.",
           },
         ]);
       }
@@ -102,7 +100,7 @@ export default function AbuToqChatbot() {
         {
           id: (Date.now() + 1).toString(),
           sender: "bot",
-          text: "صار في خطأ صغير، رجع اطلب كمان مرة يا وحش.",
+          text: "صير خطأ، جرب كمان مرة.",
         },
       ]);
     } finally {
@@ -130,7 +128,7 @@ export default function AbuToqChatbot() {
 
       localStorage.setItem("abutoq_cart", JSON.stringify(cart));
       window.dispatchEvent(new Event("storage"));
-      alert(`تم إضافة "${product.title}" لسلتك يا غالي! 🛒`);
+      alert(`تمت الإضافة: ${product.title}`);
     } catch (e) {
       console.error(e);
     }
@@ -147,7 +145,7 @@ export default function AbuToqChatbot() {
           <Bot className="w-7 h-7" />
         </button>
       ) : (
-        <div className="bg-white border border-blue-100 rounded-3xl shadow-2xl w-[90vw] sm:w-[380px] h-[500px] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
+        <div className="bg-white border border-blue-100 rounded-3xl shadow-2xl w-[90vw] sm:w-[380px] h-[500px] flex flex-col overflow-hidden">
           {/* رأس الشات */}
           <div className="bg-blue-600 text-white p-4 flex items-center justify-between">
             <div className="flex items-center gap-2.5">
@@ -158,7 +156,7 @@ export default function AbuToqChatbot() {
                 <h3 className="font-black text-sm">مساعد أبو طوق</h3>
                 <span className="text-[10px] text-blue-100 flex items-center gap-1">
                   <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                  جاهز لخدمتك
+                  متصل
                 </span>
               </div>
             </div>
@@ -187,7 +185,7 @@ export default function AbuToqChatbot() {
                   {msg.text}
                 </div>
 
-                {/* عرض المنتجات إن وجدت مع كبسة الإضافة للسلة */}
+                {/* المنتجات وصورة مع زر الإضافة */}
                 {msg.products && msg.products.length > 0 && (
                   <div className="mt-2 space-y-2 w-full">
                     {msg.products.map((product) => (
@@ -241,7 +239,7 @@ export default function AbuToqChatbot() {
               type="text"
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
-              placeholder="اكتب طلبك هون..."
+              placeholder="اكتب طلبك..."
               className="flex-1 p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 outline-none focus:border-blue-600"
             />
             <button
