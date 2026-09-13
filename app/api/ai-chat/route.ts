@@ -1,4 +1,4 @@
-"use "client";
+"use client";
 
 import React, { useState, useEffect, useRef } from "react";
 import { MessageSquare, Send, X, ShoppingCart, Bot, User, Check } from "lucide-react";
@@ -100,7 +100,7 @@ export default function AbuToqChatbot() {
         {
           id: (Date.now() + 1).toString(),
           sender: "bot",
-          text: "صير خطأ، جرب كمان مرة.",
+          text: "صار خطأ، جرب كمان مرة.",
         },
       ]);
     } finally {
@@ -110,7 +110,8 @@ export default function AbuToqChatbot() {
 
   const addToCartFromChat = (product: any) => {
     try {
-      const existingCart = localStorage.getItem("abutoq_cart");
+      // ربط السلة بالمسار المطلوبة والتخزين المحلي الخاص بصفحة السلة
+      const existingCart = localStorage.getItem("cart_pagetsx");
       let cart = existingCart ? JSON.parse(existingCart) : [];
       const index = cart.findIndex((item: any) => item.id === product.id);
 
@@ -126,9 +127,9 @@ export default function AbuToqChatbot() {
         });
       }
 
-      localStorage.setItem("abutoq_cart", JSON.stringify(cart));
+      localStorage.setItem("cart_pagetsx", JSON.stringify(cart));
       window.dispatchEvent(new Event("storage"));
-      alert(`تمت الإضافة: ${product.title}`);
+      alert(`تمت الإضافة إلى سلة الطلبات: ${product.title}`);
     } catch (e) {
       console.error(e);
     }
@@ -185,7 +186,7 @@ export default function AbuToqChatbot() {
                   {msg.text}
                 </div>
 
-                {/* المنتجات وصورة مع زر الإضافة */}
+                {/* المنتجات وصورة مع زر إضافة إلى السلة */}
                 {msg.products && msg.products.length > 0 && (
                   <div className="mt-2 space-y-2 w-full">
                     {msg.products.map((product) => (
@@ -214,7 +215,7 @@ export default function AbuToqChatbot() {
                           className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-[11px] shrink-0 shadow-sm transition flex items-center gap-1"
                         >
                           <ShoppingCart className="w-3.5 h-3.5" />
-                          <span>أضف</span>
+                          <span>إضافة إلى السلة</span>
                         </button>
                       </div>
                     ))}
