@@ -28,7 +28,7 @@ export default function DossiersPage() {
   const [searchQuery, setSearchQuery] = useState("");
 
   /*
-   * تحميل الدوسيات الحية من Supabase
+   * تحميل كافة المنتجات والدوسيات من Supabase
    */
   useEffect(() => {
     const loadDossiers = async () => {
@@ -37,7 +37,6 @@ export default function DossiersPage() {
       const { data, error } = await supabase
         .from("products")
         .select("*")
-        .eq("category", "دوسيات")
         .order("created_at", { ascending: false });
 
       if (error) {
@@ -65,7 +64,6 @@ export default function DossiersPage() {
     }
   };
 
-  // مطابقة تماماً لقيم الأدمن المسجلة في القاعدة ("الأول", "الثاني")
   const semesters = [
     { label: "الفصل الأول", value: "الأول" },
     { label: "الفصل الثاني", value: "الثاني" },
@@ -104,21 +102,27 @@ export default function DossiersPage() {
 
   const filteredItems = dossiersList.filter((item) => {
     const yearMatch =
-      !selectedYear || String(item.year) === String(selectedYear);
+      !selectedYear ||
+      !item.year ||
+      String(item.year) === String(selectedYear);
 
-    // التحقق من توافق الفصل سواء تم تخزينه كـ "الأول" أو "الفصل الأول"
     const semesterMatch =
       !selectedSemester ||
+      !item.semester ||
       item.semester === selectedSemester ||
       item.semester === `الفصل ${selectedSemester}` ||
       (selectedSemester === "الأول" && item.semester === "الفصل الأول") ||
       (selectedSemester === "الثاني" && item.semester === "الفصل الثاني");
 
     const subjectMatch =
-      !selectedSubject || item.subject === selectedSubject;
+      !selectedSubject ||
+      !item.subject ||
+      item.subject === selectedSubject;
 
     const typeMatch =
-      !selectedDossierType || item.dossier_type === selectedDossierType;
+      !selectedDossierType ||
+      !item.dossier_type ||
+      item.dossier_type === selectedDossierType;
 
     const title = String(item.title || "").toLowerCase();
     const subject = String(item.subject || "").toLowerCase();
@@ -128,7 +132,6 @@ export default function DossiersPage() {
       title.includes(normalizedSearch) ||
       subject.includes(normalizedSearch);
 
-    // في حال كتب الزبون نصاً في مربع البحث، نعرض النتائج المطابقة فوراً
     if (normalizedSearch) {
       return searchMatch;
     }
@@ -197,7 +200,7 @@ export default function DossiersPage() {
               onClick={resetAll}
               className="hover:text-blue-600 whitespace-nowrap"
             >
-              الأجيال
+              الأجيل
             </button>
 
             {selectedYear && (
