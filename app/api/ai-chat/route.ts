@@ -42,7 +42,7 @@ export async function POST(req: Request) {
       );
     }
 
-    // 2. تجهيز وتنسيق قائمة المنتجات
+    // 2. تجهيز قائمة المنتجات للذكاء الاصطناعي
     const products = productsData || [];
     let storeProductsText = "";
 
@@ -50,21 +50,23 @@ export async function POST(req: Request) {
       storeProductsText = "لا توجد أي منتجات مضافة في المتجر حالياً.";
     } else {
       storeProductsText = products
-        .map((p, i) => {
+        .map((p) => {
           const details = [
+            `ID: ${p.id}`,
             `الاسم: ${p.title || "بدون اسم"}`,
             `السعر: ${
               p.price !== null && p.price !== undefined
                 ? `${p.price} د.أ`
                 : "غير محدد"
             }`,
+            `الصورة: ${p.image || ""}`,
             `القسم: ${p.category || "عام"}`,
           ];
           if (p.subject) details.push(`المادة: ${p.subject}`);
           if (p.year) details.push(`الجيل: ${p.year}`);
           if (p.semester) details.push(`الفصل: ${p.semester}`);
           if (p.dossier_type) details.push(`النوع: ${p.dossier_type}`);
-          return `[${i + 1}] ${details.join(" | ")}`;
+          return details.join(" | ");
         })
         .join("\n");
     }
@@ -77,9 +79,9 @@ export async function POST(req: Request) {
       })
     );
 
-    // 4. إرسال الطلب للذكاء الاصطناعي مع المنتجات الفعلية
+    // 4. إرسال الطلب لـ Gemini مع التعليمات الأردنية والمختصرة
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${GEMINI_API_KEY}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
       {
         method: "POST",
         headers: {
@@ -89,17 +91,18 @@ export async function POST(req: Request) {
           systemInstruction: {
             parts: [
               {
-                text: `أنت المساعد الذكي الرسمي لمكتبة أبو طوق.
+                text: `أنت موظف في مكتبة "أبو طوق"، تحكي بلهجة أردنية عامية، مرتبة، ومختصرة جداً بدون كثرة حكي ولت وعجن.
 
-قواعد التعامل مع طلبات الزبائن:
-1. فهم العامية والبحث المرن: افهم الزبون كيفما كتب ("دوسيه"، "دوسية"، "ابحثلي عن"، "عندكو"، "بدي"). استخرج الكلمة المفتاحية (اسم المادة، اسم الأستاذ، أو اسم المنتج) وقارنها بالقائمة المرفقة.
-2. التطابق التقريبي والجزئي: إذا كتب الزبون اسماً مثل "عمر" وكان جزءاً من اسم منتج عندك أو قريباً منه جداً، اعتبره موجوداً فوراً.
-3. التوافر: إذا كان المنتج موجوداً، جاوبه بلهجة أردنية لطيفة ومختصرة واذكر اسم المنتج وسعره المكتوب (مثال: "أه والله موجودة [اسم الدوسية] وسعرها [السعر] د.أ، بتحب نجهزلك إياها؟").
-4. عدم التوافر: إذا لم تجد أي كلمة قريبة أو مطابقة في القائمة، احكيله بوضوح: "لا والله، مش موجودة حالياً بالمكتبة".
-5. ممنوع التخمين: لا تخترع أسماء أو أسعار من عندك، واعتمد حصراً على القائمة.
-6. لا تفصح عن أي تفاصيل برمجية (Supabase أو API أو قاعدة بيانات) للمستخدم.
+قواعد شخصيتك وردك على الزبائن:
+1. الشخصية: احكي زي كأنك موظف أردني حقيقي بمكتبة (مثال: "أهلاً وسهلاً"، "هلا بيك"، "هلا معلم"، "أه والله موجودة"، "تفضل هيها"، "مش متوفرة حالياً والله").
+2. اختصار الحكي: ممنوع تكثر كلام! جاوب السطر المفيد مباشرة وبشكل مختصر جداً.
+3. المطابقة والبحث: افهم شو ما كتب الزبون ("دوسيه"، "بطاقة"، "عمر"، "مكثف") وقارن الاسم بالقائمة.
+4. إرفاق كرت المنتج: إذا لقيت المنتج المطلوب، جاوبه بسطرين قصار وأرفق كائن الـ JSON الخاص بالمنتج بآخر كلامك بالضبط بهاي الصيغة:
+   <<<PRODUCT_DATA>>>{"id": "...", "title": "...", "price": 0, "image": "..."}<<<END_PRODUCT_DATA>>>
+5. غير متوفر: إذا طلب شيء مش موجود أبداً، احكيله بوضوح وبدون زيادة حكي: "لا والله يا غالي مش متوفرة حالياً بالمكتبة."
+6. ممنوع تأليف أسعار أو دوسيات من عندك، اعتمد فقط على قائمة المكتبة المرفقة below.
 
-قائمة المتجر المتوفرة حالياً من قاعدة البيانات:
+قائمة متجر مكتبة أبو طوق الحالية:
 ${storeProductsText}`,
               },
             ],
@@ -119,11 +122,25 @@ ${storeProductsText}`,
       );
     }
 
-    const reply =
+    const fullReply =
       data?.candidates?.[0]?.content?.parts?.[0]?.text ||
-      "أهلاً بك، كيف بقدر أساعدك اليوم؟";
+      "أهلاً وسهلاً بيك، كيف بقدر أساعدك؟";
 
-    return NextResponse.json({ reply });
+    // استخراج بيانات المنتج للبطاقة إن وُجدت
+    let productData = null;
+    let cleanReply = fullReply;
+
+    const match = fullReply.match(/<<<PRODUCT_DATA>>>(.*?)<<<END_PRODUCT_DATA>>>/s);
+    if (match && match[1]) {
+      try {
+        productData = JSON.parse(match[1].trim());
+        cleanReply = fullReply.replace(/<<<PRODUCT_DATA>>>(.*?)<<<END_PRODUCT_DATA>>>/s, "").trim();
+      } catch (e) {
+        console.error("خطأ في قراءة JSON المنتج:", e);
+      }
+    }
+
+    return NextResponse.json({ reply: cleanReply, product: productData });
   } catch (error: any) {
     console.error("Server Error:", error);
     return NextResponse.json(
