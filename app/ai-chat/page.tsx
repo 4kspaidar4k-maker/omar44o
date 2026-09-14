@@ -1,228 +1,148 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
-import Link from "next/link";
-import {
-  ArrowRight,
-  Send,
-  Bot,
-  User,
-  Sparkles,
-} from "lucide-react";
+import React, { useState } from "react";
+import { useCart } from "@/context/CartContext";
+import { useRouter } from "next/navigation";
+import { ShoppingCart } from "lucide-react";
 
-type Message = {
-  role: "user" | "assistant";
-  content: string;
-};
+export default function ChatWidget() {
+  const { addToCart } = useCart() as any;
+  const router = useRouter();
 
-export default function AIChatPage() {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      role: "assistant",
-      content:
-        "أهلاً بك في مكتبة أبو طوق! أنا مساعدك الذكي 🤖\nأقدر أساعدك بأي سؤال، وأبحث لك داخل منتجات المكتبة من الدوسيات والقرطاسية والألعاب. كيف يمكنني مساعدتك اليوم؟",
-    },
-  ]);
-
+  const [messages, setMessages] = useState<any[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const sendMessage = async () => {
+    if (!input.trim()) return;
 
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({
-      behavior: "smooth",
-    });
-  }, [messages, loading]);
-
-  const handleSendMessage = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!input.trim() || loading) return;
-
-    const userQuery = input.trim();
+    const userMessage = { role: "user", content: input };
+    const newMessages = [...messages, userMessage];
+    setMessages(newMessages);
     setInput("");
-
-    const newUserMessage: Message = {
-      role: "user",
-      content: userQuery,
-    };
-
-    const updatedMessages: Message[] = [...messages, newUserMessage];
-    setMessages(updatedMessages);
     setLoading(true);
 
     try {
-      // إرسال الرسالة إلى مسار السيرفر الخلفي الذي يحتوي على المفتاح
-      const response = await fetch("/api/ai-chat", {
+      const res = await fetch("/api/chat", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          messages: updatedMessages,
-        }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messages: newMessages }),
       });
 
-      const responseText = await response.text();
-      let data: any = null;
+      const data = await res.json();
 
-      try {
-        data = JSON.parse(responseText);
-      } catch {
-        throw new Error(
-          `السيرفر أعاد ردًا غير صالح. كود الحالة: ${response.status}`
-        );
+      if (data.reply) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "assistant",
+            content: data.reply,
+            product: data.product, // يحتفظ ببيانات المنتج إن وجد
+          },
+        ]);
       }
-
-      if (!response.ok) {
-        throw new Error(
-          data?.error || "حدث خطأ في المساعد الذكي."
-        );
-      }
-
-      const aiReply =
-        data?.reply || "عذرًا، لم أستطع تجهيز الإجابة حاليًا.";
-
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: "assistant",
-          content: aiReply,
-        },
-      ]);
-    } catch (error: any) {
-      console.error("AI Chat Error:", error);
-
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: "assistant",
-          content:
-            error?.message ||
-            "حدث خطأ في الاتصال بالمساعد الذكي. حاول مرة أخرى.",
-        },
-      ]);
+    } catch (err) {
+      console.error(err);
     } finally {
       setLoading(false);
     }
   };
 
+  const handleAddToCartAndGo = (product: any) => {
+    // 1. إضافة المنتج إلى السلة
+    addToCart(
+      {
+        id: product.id,
+        name: product.title,
+        price: Number(product.price),
+        image: product.image,
+      },
+      1
+    );
+
+    // 2. الانتقال المباشر إلى صفحة السلة
+    router.push("/cart");
+  };
+
   return (
-    <div
-      dir="rtl"
-      className="min-h-screen bg-slate-50 text-slate-800 flex flex-col"
-    >
-      {/* Header */}
-      <header className="sticky top-0 z-40 backdrop-blur-md bg-white/85 border-b border-blue-100 shadow-sm">
-        <div className="max-w-4xl mx-auto px-6 h-20 flex items-center">
-          <div className="flex items-center gap-4">
-            <Link
-              href="/"
-              className="p-2 rounded-full hover:bg-slate-100 text-blue-900 transition"
-              title="الرجوع للرئيسية"
+    <div className="flex flex-col h-[500px] w-full max-w-lg bg-white border rounded-2xl p-4 shadow-lg">
+      <div className="flex-1 overflow-y-auto space-y-4 p-2">
+        {messages.map((msg, index) => (
+          <div
+            key={index}
+            className={`flex flex-col ${
+              msg.role === "user" ? "items-end" : "items-start"
+            }`}
+          >
+            {/* نص الرسالة */}
+            <div
+              className={`p-3 rounded-2xl max-w-[80%] text-sm font-bold ${
+                msg.role === "user"
+                  ? "bg-blue-600 text-white rounded-br-none"
+                  : "bg-slate-100 text-slate-800 rounded-bl-none"
+              }`}
             >
-              <ArrowRight className="w-6 h-6" />
-            </Link>
-
-            <div className="flex items-center gap-2">
-              <div className="w-9 h-9 bg-blue-600 rounded-xl text-white flex items-center justify-center shadow-sm">
-                <Sparkles className="w-5 h-5" />
-              </div>
-
-              <h1 className="text-lg md:text-xl font-black text-blue-950">
-                مساعد مكتبة أبو طوق الذكي
-              </h1>
+              {msg.content}
             </div>
-          </div>
-        </div>
-      </header>
 
-      {/* Main */}
-      <main className="max-w-4xl mx-auto px-4 py-6 w-full flex-1 flex flex-col">
-        <div className="bg-white border border-blue-100 rounded-3xl p-4 sm:p-6 shadow-sm flex-1 flex flex-col overflow-hidden">
-          {/* Messages */}
-          <div className="overflow-y-auto space-y-4 pr-2 max-h-[65vh] flex-1">
-            {messages.map((msg, idx) => (
-              <div
-                key={idx}
-                className={`flex items-start gap-3 ${
-                  msg.role === "user" ? "flex-row-reverse" : "flex-row"
-                }`}
-              >
-                {/* Avatar */}
-                <div
-                  className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 shadow-sm ${
-                    msg.role === "user"
-                      ? "bg-blue-600 text-white"
-                      : "bg-blue-50 text-blue-700 border border-blue-100"
-                  }`}
-                >
-                  {msg.role === "user" ? (
-                    <User className="w-5 h-5" />
-                  ) : (
-                    <Bot className="w-5 h-5" />
-                  )}
-                </div>
-
-                {/* Message */}
-                <div
-                  className={`p-4 rounded-2xl max-w-[85%] text-sm sm:text-base leading-relaxed whitespace-pre-line ${
-                    msg.role === "user"
-                      ? "bg-blue-600 text-white rounded-tr-none shadow-sm"
-                      : "bg-slate-100 text-slate-800 rounded-tl-none border border-slate-200"
-                  }`}
-                >
-                  {msg.content}
-                </div>
-              </div>
-            ))}
-
-            {/* Loading */}
-            {loading && (
-              <div className="flex items-start gap-3">
-                <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-700 border border-blue-100 flex items-center justify-center">
-                  <Bot className="w-5 h-5 animate-spin" />
-                </div>
-
-                <div className="p-4 rounded-2xl bg-slate-100 text-slate-500 text-sm rounded-tl-none border border-slate-200 animate-pulse">
-                  أبحث في منتجات المكتبة وأجهز الإجابة...
+            {/* عرض بطاقة المنتج إذا وُجدت مع رسالة الـ AI */}
+            {msg.product && (
+              <div className="mt-3 w-64 bg-white border border-blue-200 rounded-2xl overflow-hidden shadow-md">
+                {msg.product.image ? (
+                  <img
+                    src={msg.product.image}
+                    alt={msg.product.title}
+                    className="w-full h-36 object-cover"
+                  />
+                ) : (
+                  <div className="w-full h-36 bg-slate-100 flex items-center justify-center text-slate-400 font-bold text-xs">
+                    بدون صورة
+                  </div>
+                )}
+                <div className="p-3">
+                  <h4 className="font-black text-sm text-blue-950 line-clamp-1">
+                    {msg.product.title}
+                  </h4>
+                  <p className="text-blue-700 font-black text-sm mt-1">
+                    {msg.product.price} د.أ
+                  </p>
+                  <button
+                    onClick={() => handleAddToCartAndGo(msg.product)}
+                    className="w-full mt-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition flex items-center justify-center gap-2"
+                  >
+                    <ShoppingCart className="w-4 h-4" />
+                    أضف للسلة والانتقال
+                  </button>
                 </div>
               </div>
             )}
-
-            <div ref={messagesEndRef} />
           </div>
+        ))}
 
-          {/* Input Form */}
-          <form
-            onSubmit={handleSendMessage}
-            className="mt-4 pt-4 border-t border-slate-100 flex items-center gap-2"
-          >
-            <input
-              type="text"
-              placeholder="اسألني عن أي دوسية، مادة، سعر، أو منتجات المكتبة..."
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              disabled={loading}
-              className="flex-1 p-3.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-blue-600 font-medium text-slate-900"
-            />
+        {loading && (
+          <div className="text-xs text-slate-400 font-bold animate-pulse">
+            جاري التفكير...
+          </div>
+        )}
+      </div>
 
-            <button
-              type="submit"
-              disabled={loading || !input.trim()}
-              className="p-3.5 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white rounded-xl transition shadow-sm flex items-center justify-center"
-            >
-              <Send className="w-5 h-5" />
-            </button>
-          </form>
-        </div>
-      </main>
-
-      {/* Footer */}
-      <footer className="border-t border-slate-200 bg-white py-4 text-center text-xs text-slate-400">
-        ©️ مكتبة أبو طوق - المدعوم بالذكاء الاصطناعي
-      </footer>
+      {/* منطقة الإدخال */}
+      <div className="flex gap-2 mt-2 pt-2 border-t">
+        <input
+          type="text"
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && sendMessage()}
+          placeholder="اسأل عن أي دوسية أو بطاقة..."
+          className="flex-1 px-4 py-2 border rounded-xl text-sm font-bold outline-none focus:border-blue-500"
+        />
+        <button
+          onClick={sendMessage}
+          className="px-4 py-2 bg-blue-600 text-white font-bold rounded-xl text-sm hover:bg-blue-700"
+        >
+          إرسال
+        </button>
+      </div>
     </div>
   );
 }
