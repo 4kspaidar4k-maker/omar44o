@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
 
 import {
@@ -18,7 +18,6 @@ import {
   Navigation,
   Truck,
   Clock,
-  Bell,
   X,
 } from "lucide-react";
 
@@ -31,20 +30,20 @@ type DossierType = "مادة" | "مكثف" | "بنك أسئلة";
 type StationeryCategory = "قرطاسية" | "أدوات" | "ألعاب";
 
 type Product = {
-  id: string;
-  created_at?: string;
+  id: string | number;
   title: string;
   price: number;
-  year?: string | null;
+  image?: string | null;
+  year?: string | number | null;
   semester?: string | null;
   subject?: string | null;
-  category: string;
-  image?: string | null;
   dossier_type?: string | null;
+  category?: string | null;
+  created_at?: string | null;
 };
 
 type OrderItem = {
-  id: string;
+  id?: string | number;
   name: string;
   price: number;
   quantity: number;
@@ -52,17 +51,17 @@ type OrderItem = {
 };
 
 type Order = {
-  id: string;
-  created_at: string;
-  customer: string;
-  phone: string;
+  id: string | number;
+  created_at?: string | null;
+  customer?: string | null;
+  phone?: string | null;
   location?: string | null;
   map_link?: string | null;
-  subtotal: number;
-  delivery_fee: number;
-  total: number;
-  status: string;
-  items: OrderItem[] | unknown;
+  subtotal?: number | null;
+  delivery_fee?: number | null;
+  total?: number | null;
+  status?: string | null;
+  items?: OrderItem[] | null;
 };
 
 const subjectsByYear: Record<string, string[]> = {
@@ -87,17 +86,7 @@ const subjectsByYear: Record<string, string[]> = {
   ],
 };
 
-const stationeryCategories: StationeryCategory[] = [
-  "قرطاسية",
-  "أدوات",
-  "ألعاب",
-];
-
 export default function DashboardPage() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [passwordInput, setPasswordInput] = useState("");
-  const [authError, setAuthError] = useState("");
-
   const [activeTab, setActiveTab] = useState<Tab>("orders");
 
   const [dossiers, setDossiers] = useState<Product[]>([]);
@@ -121,17 +110,6 @@ export default function DashboardPage() {
     useState<StationeryCategory>("قرطاسية");
 
   const [imagePreview, setImagePreview] = useState("");
-
-  const [notification, setNotification] = useState<{
-    id: string;
-    customer: string;
-  } | null>(null);
-
-  const knownOrderIdsRef = useRef<Set<string>>(new Set());
-  const firstOrdersLoadRef = useRef(true);
-  const notificationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
-    null
-  );
 
   const normalizedSearch = searchQuery.trim().toLowerCase();
 
@@ -165,11 +143,9 @@ export default function DashboardPage() {
   const filteredOrders = orders.filter((order) => {
     if (!normalizedSearch) return true;
 
-    const items = Array.isArray(order.items)
-      ? (order.items as OrderItem[])
-      : [];
-
-    const itemNames = items.map((item) => item.name).join(" ");
+    const orderItems = Array.isArray(order.items)
+      ? order.items.map((item) => item.name).join(" ")
+      : "";
 
     return [
       order.id,
@@ -177,7 +153,7 @@ export default function DashboardPage() {
       order.phone,
       order.location,
       order.status,
-      itemNames,
+      orderItems,
     ]
       .filter(Boolean)
       .some((value) =>
@@ -185,120 +161,7 @@ export default function DashboardPage() {
       );
   });
 
-  const showDatabaseError = (
-    titleText: string,
-    error: {
-      message?: string;
-      code?: string;
-      details?: string;
-      hint?: string;
-    }
-  ) => {
-    console.error(titleText, error);
-
-    const details = [
-      error.message ? `الرسالة: ${error.message}` : "",
-      error.code ? `الكود: ${error.code}` : "",
-      error.details ? `التفاصيل: ${error.details}` : "",
-      error.hint ? `التلميح: ${error.hint}` : "",
-    ]
-      .filter(Boolean)
-      .join("\n");
-
-    alert(`${titleText}\n\n${details || "لا توجد تفاصيل إضافية."}`);
-  };
-
-  const playNotificationSound = () => {
-    try {
-      const AudioContextClass =
-        window.AudioContext ||
-        (window as typeof window & {
-          webkitAudioContext?: typeof AudioContext;
-        }).webkitAudioContext;
-
-      if (!AudioContextClass) return;
-
-      const audioContext = new AudioContextClass();
-      const oscillator = audioContext.createOscillator();
-      const gainNode = audioContext.createGain();
-
-      oscillator.type = "sine";
-      oscillator.frequency.setValueAtTime(880, audioContext.currentTime);
-      oscillator.frequency.setValueAtTime(
-        660,
-        audioContext.currentTime + 0.15
-      );
-
-      gainNode.gain.setValueAtTime(0.0001, audioContext.currentTime);
-      gainNode.gain.exponentialRampToValueAtTime(
-        0.25,
-        audioContext.currentTime + 0.02
-      );
-      gainNode.gain.exponentialRampToValueAtTime(
-        0.0001,
-        audioContext.currentTime + 0.5
-      );
-
-      oscillator.connect(gainNode);
-      gainNode.connect(audioContext.destination);
-
-      oscillator.start();
-      oscillator.stop(audioContext.currentTime + 0.5);
-
-      window.setTimeout(() => {
-        audioContext.close().catch(() => {});
-      }, 700);
-    } catch (error) {
-      console.error("Notification sound error:", error);
-    }
-  };
-
-  const showBrowserNotification = (order: Order) => {
-    try {
-      if (!("Notification" in window)) return;
-
-      if (Notification.permission === "granted") {
-        new Notification("🔔 طلب جديد - مكتبة أبو طوق", {
-          body: `وصل طلب جديد من ${order.customer}`,
-          icon: "/favicon.ico",
-        });
-      }
-    } catch (error) {
-      console.error("Browser notification error:", error);
-    }
-  };
-
-  const showNewOrderNotification = (order: Order) => {
-    setNotification({
-      id: order.id,
-      customer: order.customer,
-    });
-
-    playNotificationSound();
-    showBrowserNotification(order);
-
-    if (notificationTimerRef.current) {
-      clearTimeout(notificationTimerRef.current);
-    }
-
-    notificationTimerRef.current = setTimeout(() => {
-      setNotification(null);
-    }, 8000);
-  };
-
-  const requestNotificationPermission = async () => {
-    try {
-      if (!("Notification" in window)) return;
-
-      if (Notification.permission === "default") {
-        await Notification.requestPermission();
-      }
-    } catch (error) {
-      console.error("Notification permission error:", error);
-    }
-  };
-
-  const loadProductsOnly = async () => {
+  const loadProducts = async () => {
     setLoadingProducts(true);
 
     try {
@@ -308,7 +171,8 @@ export default function DashboardPage() {
         .order("created_at", { ascending: false });
 
       if (error) {
-        showDatabaseError("تعذر تحميل المنتجات من Supabase.", error);
+        console.error("PRODUCTS LOAD ERROR:", error);
+        alert("تعذر تحميل المنتجات: " + error.message);
         return;
       }
 
@@ -320,23 +184,19 @@ export default function DashboardPage() {
 
       setStationery(
         allProducts.filter((item) =>
-          stationeryCategories.includes(
-            item.category as StationeryCategory
-          )
+          ["قرطاسية", "أدوات", "ألعاب"].includes(item.category || "")
         )
       );
-    } catch (error) {
-      console.error("LOAD PRODUCTS ERROR:", error);
-      alert("حدث خطأ غير متوقع أثناء تحميل المنتجات.");
+    } catch (error: any) {
+      console.error("UNEXPECTED PRODUCTS LOAD ERROR:", error);
+      alert("حدث خطأ أثناء تحميل المنتجات.");
     } finally {
       setLoadingProducts(false);
     }
   };
 
-  const loadOrdersOnly = async (silent = false) => {
-    if (!silent) {
-      setLoadingOrders(true);
-    }
+  const loadOrders = async () => {
+    setLoadingOrders(true);
 
     try {
       const { data, error } = await supabase
@@ -345,87 +205,24 @@ export default function DashboardPage() {
         .order("created_at", { ascending: false });
 
       if (error) {
-        if (!silent) {
-          showDatabaseError("تعذر تحميل الطلبات من Supabase.", error);
-        } else {
-          console.error("SUPABASE ORDERS POLLING ERROR:", error);
-        }
-
+        console.error("ORDERS LOAD ERROR:", error);
+        alert("تعذر تحميل الطلبات: " + error.message);
         return;
       }
 
-      const allOrders = (data || []) as Order[];
-
-      setOrders(allOrders);
-
-      const currentIds = new Set(allOrders.map((order) => order.id));
-
-      if (firstOrdersLoadRef.current) {
-        knownOrderIdsRef.current = currentIds;
-        firstOrdersLoadRef.current = false;
-        return;
-      }
-
-      if (silent) {
-        const newlyCreatedOrders = allOrders.filter(
-          (order) =>
-            !knownOrderIdsRef.current.has(order.id) &&
-            (order.status === "قيد التجهيز والتوصيل" ||
-              order.status === "قيد التجهيز")
-        );
-
-        if (newlyCreatedOrders.length > 0) {
-          showNewOrderNotification(newlyCreatedOrders[0]);
-        }
-      }
-
-      knownOrderIdsRef.current = currentIds;
-    } catch (error) {
-      console.error("LOAD ORDERS ERROR:", error);
+      setOrders((data || []) as Order[]);
+    } catch (error: any) {
+      console.error("UNEXPECTED ORDERS LOAD ERROR:", error);
+      alert("حدث خطأ أثناء تحميل الطلبات.");
     } finally {
-      if (!silent) {
-        setLoadingOrders(false);
-      }
+      setLoadingOrders(false);
     }
   };
 
   useEffect(() => {
-    if (!isAuthenticated) return;
-
-    requestNotificationPermission();
-    loadProductsOnly();
-    loadOrdersOnly(false);
-  }, [isAuthenticated]);
-
-  useEffect(() => {
-    if (!isAuthenticated) return;
-
-    const interval = setInterval(() => {
-      loadOrdersOnly(true);
-    }, 5000);
-
-    return () => clearInterval(interval);
-  }, [isAuthenticated]);
-
-  useEffect(() => {
-    return () => {
-      if (notificationTimerRef.current) {
-        clearTimeout(notificationTimerRef.current);
-      }
-    };
+    loadProducts();
+    loadOrders();
   }, []);
-
-  const handleLogin = (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-
-    if (passwordInput === "201028") {
-      setIsAuthenticated(true);
-      setAuthError("");
-      return;
-    }
-
-    setAuthError("كلمة المرور غير صحيحة.");
-  };
 
   const handleImageChange = (
     event: React.ChangeEvent<HTMLInputElement>
@@ -433,11 +230,6 @@ export default function DashboardPage() {
     const file = event.target.files?.[0];
 
     if (!file) return;
-
-    if (!file.type.startsWith("image/")) {
-      alert("يرجى اختيار ملف صورة فقط.");
-      return;
-    }
 
     const reader = new FileReader();
 
@@ -448,13 +240,11 @@ export default function DashboardPage() {
     reader.readAsDataURL(file);
   };
 
-  const handleAddItem = async (
-    event: React.FormEvent<HTMLFormElement>
-  ) => {
+  const handleAddItem = async (event: React.FormEvent) => {
     event.preventDefault();
 
     if (!title.trim()) {
-      alert("اكتب اسم العنصر أولاً.");
+      alert("اكتب اسم العنصر أولًا.");
       return;
     }
 
@@ -472,15 +262,15 @@ export default function DashboardPage() {
 
     const isDossier = activeTab === "dossiers";
 
-    const newItem = {
+    const newProduct = {
       title: title.trim(),
       price: numericPrice,
+      image: imagePreview || null,
       year: isDossier ? year : null,
       semester: isDossier ? semester : null,
       subject: isDossier ? subject : null,
       dossier_type: isDossier ? dossierType : null,
       category: isDossier ? "دوسيات" : categoryType,
-      image: imagePreview || null,
     };
 
     setLoadingProducts(true);
@@ -488,12 +278,13 @@ export default function DashboardPage() {
     try {
       const { data, error } = await supabase
         .from("products")
-        .insert([newItem])
+        .insert([newProduct])
         .select("*")
         .single();
 
       if (error) {
-        showDatabaseError("لم يتم حفظ المنتج داخل قاعدة البيانات.", error);
+        console.error("PRODUCT INSERT ERROR:", error);
+        alert("لم يتم حفظ المنتج: " + error.message);
         return;
       }
 
@@ -509,139 +300,93 @@ export default function DashboardPage() {
       setPrice("");
       setImagePreview("");
 
-      alert("تم حفظ العنصر داخل قاعدة البيانات ونشره بنجاح.");
-    } catch (error) {
+      alert("تم حفظ المنتج ونشره بنجاح.");
+    } catch (error: any) {
       console.error("UNEXPECTED INSERT ERROR:", error);
-      alert("حدث خطأ غير متوقع أثناء حفظ العنصر.");
+      alert("حدث خطأ أثناء حفظ المنتج.");
     } finally {
       setLoadingProducts(false);
     }
   };
 
   const handleDeleteProduct = async (
-    id: string,
+    productId: string | number,
     type: "dossiers" | "stationery"
   ) => {
-    if (!confirm("هل أنت متأكد من حذف هذا العنصر نهائيًا؟")) {
-      return;
-    }
+    const confirmed = confirm("هل أنت متأكد من حذف هذا المنتج نهائيًا؟");
+
+    if (!confirmed) return;
 
     try {
       const { data, error } = await supabase
         .from("products")
         .delete()
-        .eq("id", id)
+        .eq("id", productId)
         .select("id");
 
       if (error) {
-        showDatabaseError("لم يتم حذف العنصر من قاعدة البيانات.", error);
+        console.error("PRODUCT DELETE ERROR:", error);
+        alert("لم يتم حذف المنتج: " + error.message);
         return;
       }
 
       if (!data || data.length === 0) {
         alert(
-          "لم يتم حذف العنصر. قد تكون سياسات RLS تمنع الحذف من Supabase."
+          "لم يتم حذف المنتج. تحقق من سياسات الحماية RLS في Supabase."
         );
         return;
       }
 
       if (type === "dossiers") {
         setDossiers((previous) =>
-          previous.filter((item) => item.id !== id)
+          previous.filter((item) => item.id !== productId)
         );
       } else {
         setStationery((previous) =>
-          previous.filter((item) => item.id !== id)
+          previous.filter((item) => item.id !== productId)
         );
       }
 
-      alert("تم حذف العنصر بنجاح.");
-    } catch (error) {
-      console.error("DELETE PRODUCT ERROR:", error);
-      alert("حدث خطأ أثناء حذف العنصر.");
+      alert("تم حذف المنتج بنجاح.");
+    } catch (error: any) {
+      console.error("UNEXPECTED PRODUCT DELETE ERROR:", error);
+      alert("حدث خطأ أثناء حذف المنتج.");
     }
   };
 
-  const handleMarkAsReceived = async (orderId: string) => {
+  const updateOrderStatus = async (
+    orderId: string | number,
+    newStatus: string
+  ) => {
     try {
       const { data, error } = await supabase
         .from("orders")
-        .update({
-          status: "تم الاستلام",
-        })
+        .update({ status: newStatus })
         .eq("id", orderId)
-        .select("id,status")
+        .select("*")
         .maybeSingle();
 
-      if (error) {
-        showDatabaseError("تعذر تحديث حالة الطلب.", error);
-        return;
-      }
-
-      if (!data) {
-        alert("لم يتم تحديث الطلب. تحقق من صلاحيات Supabase.");
+      if (error || !data) {
+        console.error("ORDER STATUS UPDATE ERROR:", error);
+        alert("تعذر تحديث حالة الطلب.");
         return;
       }
 
       setOrders((previous) =>
         previous.map((order) =>
-          order.id === orderId
-            ? { ...order, status: "تم الاستلام" }
-            : order
+          order.id === orderId ? (data as Order) : order
         )
       );
-
-      knownOrderIdsRef.current.add(orderId);
-
-      if (notification?.id === orderId) {
-        setNotification(null);
-      }
     } catch (error) {
-      console.error("MARK RECEIVED ERROR:", error);
-      alert("حدث خطأ أثناء استلام الطلب.");
+      console.error("UNEXPECTED ORDER STATUS ERROR:", error);
+      alert("حدث خطأ أثناء تحديث حالة الطلب.");
     }
   };
 
-  const handleStartDelivery = async (orderId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from("orders")
-        .update({
-          status: "جاري التوصيل",
-        })
-        .eq("id", orderId)
-        .select("id,status")
-        .maybeSingle();
+  const handleDeleteOrder = async (orderId: string | number) => {
+    const confirmed = confirm("هل أنت متأكد من حذف الطلب نهائيًا؟");
 
-      if (error) {
-        showDatabaseError("تعذر تغيير حالة الطلب.", error);
-        return;
-      }
-
-      if (!data) {
-        alert("لم يتم تحديث الطلب. تحقق من صلاحيات Supabase.");
-        return;
-      }
-
-      setOrders((previous) =>
-        previous.map((order) =>
-          order.id === orderId
-            ? { ...order, status: "جاري التوصيل" }
-            : order
-        )
-      );
-
-      knownOrderIdsRef.current.add(orderId);
-    } catch (error) {
-      console.error("START DELIVERY ERROR:", error);
-      alert("حدث خطأ أثناء بدء التوصيل.");
-    }
-  };
-
-  const handleDeleteOrder = async (orderId: string) => {
-    if (!confirm("هل أنت متأكد من حذف هذا الطلب نهائيًا؟")) {
-      return;
-    }
+    if (!confirmed) return;
 
     try {
       const { data, error } = await supabase
@@ -651,13 +396,14 @@ export default function DashboardPage() {
         .select("id");
 
       if (error) {
-        showDatabaseError("تعذر حذف الطلب من قاعدة البيانات.", error);
+        console.error("ORDER DELETE ERROR:", error);
+        alert("تعذر حذف الطلب: " + error.message);
         return;
       }
 
       if (!data || data.length === 0) {
         alert(
-          "لم يتم حذف الطلب. تحقق من سياسات RLS في جدول orders."
+          "لم يتم حذف الطلب. تحقق من سياسات الحماية RLS في Supabase."
         );
         return;
       }
@@ -665,130 +411,24 @@ export default function DashboardPage() {
       setOrders((previous) =>
         previous.filter((order) => order.id !== orderId)
       );
-
-      knownOrderIdsRef.current.delete(orderId);
-
-      if (notification?.id === orderId) {
-        setNotification(null);
-      }
     } catch (error) {
-      console.error("DELETE ORDER ERROR:", error);
+      console.error("UNEXPECTED ORDER DELETE ERROR:", error);
       alert("حدث خطأ أثناء حذف الطلب.");
     }
   };
-
-  if (!isAuthenticated) {
-    return (
-      <div
-        dir="rtl"
-        className="min-h-screen bg-slate-50 flex items-center justify-center p-6 text-slate-800"
-      >
-        <div className="bg-white border border-blue-100 p-8 rounded-3xl max-w-md w-full shadow-lg">
-          <div className="text-center mb-6">
-            <h1 className="text-2xl font-black text-blue-950 mb-2">
-              لوحة تحكم مكتبة أبو طوق
-            </h1>
-
-            <p className="text-xs text-slate-500">
-              أدخل كلمة المرور الخاصة بالإدارة
-            </p>
-          </div>
-
-          <form onSubmit={handleLogin} className="space-y-4">
-            <input
-              type="password"
-              placeholder="كلمة المرور"
-              value={passwordInput}
-              onChange={(event) =>
-                setPasswordInput(event.target.value)
-              }
-              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-center tracking-widest text-lg font-bold text-slate-900 outline-none focus:border-blue-600"
-            />
-
-            {authError && (
-              <p className="text-xs text-rose-600 text-center font-bold">
-                {authError}
-              </p>
-            )}
-
-            <button
-              type="submit"
-              className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition"
-            >
-              تسجيل الدخول
-            </button>
-          </form>
-
-          <div className="mt-6 text-center">
-            <Link
-              href="/"
-              className="text-xs text-slate-400 hover:text-blue-600 font-bold"
-            >
-              العودة للموقع الرئيسي
-            </Link>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div
       dir="rtl"
       className="min-h-screen bg-slate-50 text-slate-800"
     >
-      {notification && (
-        <div className="fixed top-5 left-1/2 -translate-x-1/2 z-[100] w-[calc(100%-32px)] max-w-md">
-          <div className="bg-white border-2 border-blue-500 rounded-2xl shadow-2xl p-4 flex items-center gap-3">
-            <div className="w-11 h-11 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center shrink-0">
-              <Bell className="w-6 h-6 animate-bounce" />
-            </div>
-
-            <div className="flex-1 min-w-0">
-              <p className="font-black text-blue-950 text-sm">
-                🔔 طلب جديد!
-              </p>
-
-              <p className="text-xs text-slate-600 mt-1">
-                وصل طلب جديد من{" "}
-                <strong className="text-blue-700">
-                  {notification.customer}
-                </strong>
-              </p>
-
-              <button
-                onClick={() => {
-                  setNotification(null);
-                  setActiveTab("orders");
-                  setSearchQuery("");
-                  window.scrollTo({
-                    top: 0,
-                    behavior: "smooth",
-                  });
-                }}
-                className="text-xs font-black text-blue-600 mt-2 hover:underline"
-              >
-                مشاهدة الطلب
-              </button>
-            </div>
-
-            <button
-              onClick={() => setNotification(null)}
-              className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400"
-              title="إغلاق"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-      )}
-
-      <header className="sticky top-0 z-40 backdrop-blur-md bg-white/90 border-b border-blue-100 shadow-sm">
-        <div className="max-w-6xl mx-auto px-4 md:px-6 h-20 flex items-center justify-between gap-3">
+      <header className="sticky top-0 z-40 border-b border-blue-100 bg-white/90 backdrop-blur-md shadow-sm">
+        <div className="max-w-6xl mx-auto px-4 md:px-6 h-20 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <Link
               href="/"
               className="p-2 rounded-full hover:bg-slate-100 text-blue-900 transition"
+              aria-label="العودة للموقع الرئيسي"
             >
               <ArrowRight className="w-6 h-6" />
             </Link>
@@ -799,29 +439,32 @@ export default function DashboardPage() {
           </div>
 
           <button
-            onClick={() => setIsAuthenticated(false)}
-            className="px-3 md:px-4 py-2 bg-rose-50 text-rose-600 font-bold rounded-xl text-xs border border-rose-200"
+            onClick={() => {
+              loadProducts();
+              loadOrders();
+            }}
+            className="px-3 py-2 rounded-xl bg-blue-50 text-blue-700 border border-blue-100 text-xs font-bold"
           >
-            تسجيل الخروج
+            تحديث البيانات
           </button>
         </div>
       </header>
 
       <div className="max-w-6xl mx-auto px-4 md:px-6 mt-6">
-        <div className="grid grid-cols-3 gap-2 md:gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <button
             onClick={() => {
               setActiveTab("orders");
               setSearchQuery("");
             }}
-            className={`p-3 md:p-4 rounded-2xl border font-bold text-xs md:text-base flex flex-col md:flex-row items-center justify-center gap-2 transition ${
+            className={`p-4 rounded-2xl border font-bold text-sm flex items-center justify-center gap-2 transition ${
               activeTab === "orders"
                 ? "bg-blue-600 text-white border-blue-600 shadow-md"
-                : "bg-white text-blue-950 border-blue-100 hover:border-blue-300"
+                : "bg-white text-blue-950 border-blue-100"
             }`}
           >
             <ClipboardList className="w-5 h-5" />
-            <span>الطلبات ({orders.length})</span>
+            الطلبات ({orders.length})
           </button>
 
           <button
@@ -829,14 +472,14 @@ export default function DashboardPage() {
               setActiveTab("dossiers");
               setSearchQuery("");
             }}
-            className={`p-3 md:p-4 rounded-2xl border font-bold text-xs md:text-base flex flex-col md:flex-row items-center justify-center gap-2 transition ${
+            className={`p-4 rounded-2xl border font-bold text-sm flex items-center justify-center gap-2 transition ${
               activeTab === "dossiers"
                 ? "bg-blue-600 text-white border-blue-600 shadow-md"
-                : "bg-white text-blue-950 border-blue-100 hover:border-blue-300"
+                : "bg-white text-blue-950 border-blue-100"
             }`}
           >
             <BookOpen className="w-5 h-5" />
-            <span>الدوسيات ({dossiers.length})</span>
+            الدوسيات ({dossiers.length})
           </button>
 
           <button
@@ -844,311 +487,220 @@ export default function DashboardPage() {
               setActiveTab("stationery");
               setSearchQuery("");
             }}
-            className={`p-3 md:p-4 rounded-2xl border font-bold text-xs md:text-base flex flex-col md:flex-row items-center justify-center gap-2 transition ${
+            className={`p-4 rounded-2xl border font-bold text-sm flex items-center justify-center gap-2 transition ${
               activeTab === "stationery"
                 ? "bg-blue-600 text-white border-blue-600 shadow-md"
-                : "bg-white text-blue-950 border-blue-100 hover:border-blue-300"
+                : "bg-white text-blue-950 border-blue-100"
             }`}
           >
             <ShoppingBag className="w-5 h-5" />
-            <span className="text-center">
-              المتجر ({stationery.length})
-            </span>
+            المنتجات ({stationery.length})
           </button>
         </div>
       </div>
 
       <div className="max-w-6xl mx-auto px-4 md:px-6 mt-5">
-        <div className="relative">
-          <input
-            type="search"
-            value={searchQuery}
-            onChange={(event) =>
-              setSearchQuery(event.target.value)
-            }
-            placeholder={
-              activeTab === "orders"
-                ? "ابحث برقم الطلب أو اسم الزبون..."
-                : activeTab === "dossiers"
-                ? "ابحث عن دوسية أو مادة أو جيل..."
-                : "ابحث عن منتج أو تصنيف..."
-            }
-            className="w-full h-14 px-5 bg-white border border-blue-100 rounded-2xl shadow-sm text-sm font-bold text-slate-900 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition placeholder:text-slate-400"
-          />
-
-          {searchQuery && (
-            <button
-              type="button"
-              onClick={() => setSearchQuery("")}
-              className="absolute left-4 top-1/2 -translate-y-1/2 p-1.5 rounded-full hover:bg-slate-100 text-slate-400"
-              title="مسح البحث"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          )}
-        </div>
+        <input
+          type="search"
+          value={searchQuery}
+          onChange={(event) => setSearchQuery(event.target.value)}
+          placeholder="ابحث هنا..."
+          className="w-full h-14 px-5 bg-white border border-blue-100 rounded-2xl shadow-sm text-sm font-bold text-slate-900 outline-none focus:border-blue-500"
+        />
       </div>
 
       <main className="max-w-6xl mx-auto px-4 md:px-6 py-8">
         {activeTab === "orders" ? (
-          <div className="space-y-6">
+          <section className="space-y-5">
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <h2 className="text-lg md:text-xl font-black text-blue-950">
-                طلبات الزبائن
+              <h2 className="text-xl font-black text-blue-950">
+                الطلبات الواردة
               </h2>
 
               <button
-                onClick={() => loadOrdersOnly(false)}
+                onClick={loadOrders}
                 disabled={loadingOrders}
-                className="text-xs bg-white border border-slate-200 px-3 py-2 rounded-lg font-bold hover:bg-slate-50 transition disabled:opacity-50"
+                className="px-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold"
               >
-                {loadingOrders
-                  ? "جاري التحديث..."
-                  : "تحديث الطلبات"}
+                {loadingOrders ? "جاري التحديث..." : "تحديث الطلبات"}
               </button>
             </div>
 
             {filteredOrders.length === 0 ? (
-              <div className="bg-white border border-blue-100 rounded-3xl p-12 text-center shadow-sm">
+              <div className="bg-white border border-blue-100 rounded-3xl p-12 text-center">
                 <ClipboardList className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-
-                <h3 className="text-lg font-bold text-slate-600">
-                  {searchQuery
-                    ? "لا توجد نتائج مطابقة"
-                    : "لا توجد طلبات حاليًا"}
-                </h3>
+                <p className="font-bold text-slate-500">
+                  لا توجد طلبات حاليًا
+                </p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 gap-6">
-                {filteredOrders.map((order) => {
-                  const orderDate = order.created_at
-                    ? new Date(order.created_at).toLocaleString(
-                        "ar-JO"
-                      )
-                    : "بدون تاريخ";
+              filteredOrders.map((order) => {
+                const items = Array.isArray(order.items)
+                  ? order.items
+                  : [];
 
-                  const isPending =
-                    order.status === "قيد التجهيز والتوصيل" ||
-                    order.status === "قيد التجهيز";
+                const status = order.status || "قيد التجهيز";
 
-                  const isReceived = order.status === "تم الاستلام";
-                  const isDelivery = order.status === "جاري التوصيل";
+                return (
+                  <div
+                    key={String(order.id)}
+                    className="bg-white border border-blue-100 rounded-3xl p-5 md:p-6 shadow-sm space-y-5"
+                  >
+                    <div className="flex flex-wrap items-start justify-between gap-4 border-b border-slate-100 pb-4">
+                      <div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="bg-blue-100 text-blue-900 px-3 py-1 rounded-lg text-xs font-black">
+                            {order.id}
+                          </span>
 
-                  const items = Array.isArray(order.items)
-                    ? (order.items as OrderItem[])
-                    : [];
-
-                  return (
-                    <div
-                      key={order.id}
-                      className={`bg-white border rounded-3xl p-4 md:p-6 shadow-sm space-y-4 ${
-                        isPending
-                          ? "border-amber-200"
-                          : isReceived
-                          ? "border-emerald-200"
-                          : "border-blue-200"
-                      }`}
-                    >
-                      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 pb-4">
-                        <div className="space-y-2">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className="bg-blue-100 text-blue-900 text-xs font-black px-2.5 py-1 rounded-md break-all">
-                              {order.id}
-                            </span>
-
-                            <span className="text-xs text-slate-400">
-                              {orderDate}
-                            </span>
-
-                            {isPending && (
-                              <span className="flex items-center gap-1 bg-amber-100 text-amber-900 text-xs font-black px-2.5 py-1 rounded-md">
-                                <Clock className="w-3.5 h-3.5" />
-                                بانتظار الاستلام
-                              </span>
-                            )}
-
-                            {isReceived && (
-                              <span className="flex items-center gap-1 bg-emerald-100 text-emerald-800 text-xs font-black px-2.5 py-1 rounded-md">
-                                <Check className="w-3.5 h-3.5" />
-                                تم الاستلام
-                              </span>
-                            )}
-
-                            {isDelivery && (
-                              <span className="flex items-center gap-1 bg-blue-100 text-blue-800 text-xs font-black px-2.5 py-1 rounded-md">
-                                <Truck className="w-3.5 h-3.5" />
-                                جاري التوصيل
-                              </span>
-                            )}
-                          </div>
-
-                          <h3 className="text-lg font-black text-blue-950 flex items-center gap-2">
-                            <User className="w-4 h-4 text-blue-600" />
-                            {order.customer}
-                          </h3>
+                          <span className="text-xs text-slate-400">
+                            {order.created_at
+                              ? new Date(
+                                  order.created_at
+                                ).toLocaleString("ar-JO")
+                              : "بدون تاريخ"}
+                          </span>
                         </div>
 
-                        <div className="flex flex-wrap items-center gap-2">
+                        <h3 className="mt-2 font-black text-lg text-blue-950 flex items-center gap-2">
+                          <User className="w-4 h-4 text-blue-600" />
+                          {order.customer || "بدون اسم"}
+                        </h3>
+
+                        <p className="text-xs text-slate-500 mt-1">
+                          الحالة: {status}
+                        </p>
+                      </div>
+
+                      <div className="flex flex-wrap gap-2">
+                        {order.phone && (
                           <a
                             href={`tel:${order.phone}`}
-                            className="flex items-center gap-1.5 px-3 py-2 bg-slate-100 text-slate-800 border border-slate-200 font-bold rounded-xl text-xs"
+                            className="px-3 py-2 rounded-xl bg-slate-100 border border-slate-200 text-xs font-bold flex items-center gap-2"
                           >
-                            <Phone className="w-3.5 h-3.5 text-blue-600" />
+                            <Phone className="w-4 h-4 text-blue-600" />
                             {order.phone}
                           </a>
-
-                          {isPending && (
-                            <button
-                              onClick={() =>
-                                handleMarkAsReceived(order.id)
-                              }
-                              className="px-3 py-2 bg-emerald-600 text-white font-bold rounded-xl text-xs flex items-center gap-1"
-                            >
-                              <Check className="w-4 h-4" />
-                              تم الاستلام
-                            </button>
-                          )}
-
-                          {isReceived && (
-                            <button
-                              onClick={() =>
-                                handleStartDelivery(order.id)
-                              }
-                              className="px-3 py-2 bg-blue-600 text-white font-bold rounded-xl text-xs flex items-center gap-1"
-                            >
-                              <Truck className="w-4 h-4" />
-                              بدء التوصيل
-                            </button>
-                          )}
-
-                          <button
-                            onClick={() =>
-                              handleDeleteOrder(order.id)
-                            }
-                            className="p-2 text-rose-500 hover:bg-rose-50 rounded-xl border border-rose-100"
-                            title="حذف الطلب"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </div>
-
-                      <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 space-y-3 text-amber-950">
-                        <div className="flex items-start gap-2">
-                          <MapPin className="w-5 h-5 text-amber-600 shrink-0" />
-
-                          <div>
-                            <strong className="text-xs block font-black">
-                              موقع الاستلام:
-                            </strong>
-
-                            <p className="text-sm mt-1">
-                              {order.location || "الموقع موجود عبر الخريطة"}
-                            </p>
-                          </div>
-                        </div>
-
-                        {order.map_link && (
-                          <div className="pt-2 border-t border-amber-200 flex flex-wrap items-center justify-between gap-3">
-                            <span className="text-xs font-bold">
-                              موقع GPS:
-                            </span>
-
-                            <a
-                              href={order.map_link}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="inline-flex items-center gap-1.5 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-black rounded-xl"
-                            >
-                              <Navigation className="w-3.5 h-3.5" />
-                              فتح الموقع على خرائط قوقل
-                            </a>
-                          </div>
                         )}
-                      </div>
 
-                      <div>
-                        <h4 className="text-xs font-black text-slate-500 mb-2">
-                          المنتجات المطلوبة:
-                        </h4>
+                        <button
+                          onClick={() =>
+                            updateOrderStatus(order.id, "تم الاستلام")
+                          }
+                          className="px-3 py-2 rounded-xl bg-emerald-600 text-white text-xs font-bold flex items-center gap-2"
+                        >
+                          <Check className="w-4 h-4" />
+                          تم الاستلام
+                        </button>
 
-                        {items.length === 0 ? (
-                          <p className="text-xs text-slate-400">
-                            لا توجد تفاصيل للمنتجات داخل الطلب.
-                          </p>
-                        ) : (
-                          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                            {items.map((item, index) => (
-                              <div
-                                key={`${order.id}-${index}`}
-                                className="flex items-center gap-3 p-3 bg-slate-50 border border-slate-200 rounded-xl"
-                              >
-                                {item.image ? (
-                                  // eslint-disable-next-line @next/next/no-img-element
-                                  <img
-                                    src={item.image}
-                                    alt={item.name}
-                                    className="w-14 h-14 object-cover rounded-lg border border-slate-200"
-                                  />
-                                ) : (
-                                  <div className="w-14 h-14 rounded-lg bg-slate-200 flex items-center justify-center">
-                                    <ShoppingBag className="w-5 h-5 text-slate-400" />
-                                  </div>
-                                )}
+                        <button
+                          onClick={() =>
+                            updateOrderStatus(order.id, "جاري التوصيل")
+                          }
+                          className="px-3 py-2 rounded-xl bg-blue-600 text-white text-xs font-bold flex items-center gap-2"
+                        >
+                          <Truck className="w-4 h-4" />
+                          جاري التوصيل
+                        </button>
 
-                                <div className="min-w-0">
-                                  <p className="font-bold text-xs text-blue-950">
-                                    {item.name}
-                                  </p>
-
-                                  <p className="text-xs font-black text-blue-700 mt-1">
-                                    الكمية: {item.quantity}
-                                  </p>
-
-                                  <p className="text-[11px] text-slate-500">
-                                    السعر: {item.price} د.أ
-                                  </p>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-slate-100">
-                        <span className="font-black text-blue-950">
-                          المجموع الفرعي:{" "}
-                          <span className="text-emerald-600">
-                            {order.subtotal} د.أ
-                          </span>
-                        </span>
-
-                        <span className="font-black text-blue-950">
-                          التوصيل:{" "}
-                          <span className="text-emerald-600">
-                            {order.delivery_fee} د.أ
-                          </span>
-                        </span>
-
-                        <span className="font-black text-blue-950">
-                          الإجمالي:{" "}
-                          <span className="text-emerald-600">
-                            {order.total} د.أ
-                          </span>
-                        </span>
+                        <button
+                          onClick={() => handleDeleteOrder(order.id)}
+                          className="p-2 rounded-xl bg-rose-50 text-rose-600 border border-rose-100"
+                          title="حذف الطلب"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
                       </div>
                     </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <div className="lg:col-span-1 bg-white border border-blue-100 rounded-3xl p-6 shadow-sm space-y-6 h-fit">
-              <h2 className="text-lg font-black text-blue-950 flex items-center gap-2">
-                <PlusCircle className="w-5 h-5 text-blue-600" />
 
+                    <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 space-y-3">
+                      <div className="flex items-start gap-2">
+                        <MapPin className="w-5 h-5 text-amber-600 shrink-0" />
+
+                        <div>
+                          <p className="text-xs font-black text-amber-900">
+                            موقع الاستلام
+                          </p>
+
+                          <p className="text-sm text-amber-950 mt-1">
+                            {order.location || "عبر الخريطة"}
+                          </p>
+                        </div>
+                      </div>
+
+                      {order.map_link && (
+                        <a
+                          href={order.map_link}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 text-white text-xs font-black"
+                        >
+                          <Navigation className="w-4 h-4" />
+                          فتح الموقع على خرائط قوقل
+                        </a>
+                      )}
+                    </div>
+
+                    <div>
+                      <h4 className="text-xs font-black text-slate-500 mb-3">
+                        المنتجات المطلوبة
+                      </h4>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                        {items.map((item, index) => (
+                          <div
+                            key={index}
+                            className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 border border-slate-200"
+                          >
+                            {item.image ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img
+                                src={item.image}
+                                alt={item.name}
+                                className="w-14 h-14 object-cover rounded-lg"
+                              />
+                            ) : (
+                              <div className="w-14 h-14 rounded-lg bg-slate-200 flex items-center justify-center">
+                                <ShoppingBag className="w-5 h-5 text-slate-400" />
+                              </div>
+                            )}
+
+                            <div className="min-w-0">
+                              <p className="font-bold text-xs text-blue-950">
+                                {item.name}
+                              </p>
+
+                              <p className="text-xs font-black text-blue-700 mt-1">
+                                الكمية: {item.quantity}
+                              </p>
+
+                              <p className="text-xs text-slate-500 mt-1">
+                                السعر: {item.price} د.أ
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="border-t border-slate-100 pt-4">
+                      <p className="font-black text-blue-950">
+                        الإجمالي:{" "}
+                        <span className="text-emerald-600">
+                          {order.total ?? 0} د.أ
+                        </span>
+                      </p>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </section>
+        ) : (
+          <section className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="bg-white border border-blue-100 rounded-3xl p-6 shadow-sm h-fit">
+              <h2 className="text-lg font-black text-blue-950 flex items-center gap-2 mb-5">
+                <PlusCircle className="w-5 h-5 text-blue-600" />
                 {activeTab === "dossiers"
                   ? "إضافة دوسية جديدة"
                   : "إضافة منتج جديد"}
@@ -1163,21 +715,15 @@ export default function DashboardPage() {
                   <input
                     type="text"
                     value={title}
-                    onChange={(event) =>
-                      setTitle(event.target.value)
-                    }
-                    placeholder={
-                      activeTab === "dossiers"
-                        ? "اكتب اسم الدوسية"
-                        : "اكتب اسم المنتج"
-                    }
-                    className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 outline-none focus:border-blue-500"
+                    onChange={(event) => setTitle(event.target.value)}
+                    placeholder="اكتب اسم العنصر"
+                    className="w-full p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold text-slate-900 outline-none focus:border-blue-500"
                   />
                 </div>
 
                 <div>
                   <label className="block text-xs font-black text-slate-600 mb-1">
-                    السعر بالدينار الأردني
+                    السعر بالدينار
                   </label>
 
                   <input
@@ -1185,11 +731,9 @@ export default function DashboardPage() {
                     min="0"
                     step="0.01"
                     value={price}
-                    onChange={(event) =>
-                      setPrice(event.target.value)
-                    }
+                    onChange={(event) => setPrice(event.target.value)}
                     placeholder="مثال: 3.50"
-                    className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 outline-none focus:border-blue-500"
+                    className="w-full p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold text-slate-900 outline-none focus:border-blue-500"
                   />
                 </div>
 
@@ -1197,7 +741,7 @@ export default function DashboardPage() {
                   <>
                     <div>
                       <label className="block text-xs font-black text-slate-600 mb-1">
-                        الجيل / سنة الدراسة
+                        الجيل
                       </label>
 
                       <select
@@ -1205,15 +749,9 @@ export default function DashboardPage() {
                         onChange={(event) => {
                           const selectedYear = event.target.value;
                           setYear(selectedYear);
-
-                          const availableSubjects =
-                            subjectsByYear[selectedYear] || [];
-
-                          setSubject(
-                            availableSubjects[0] || ""
-                          );
+                          setSubject(subjectsByYear[selectedYear][0]);
                         }}
-                        className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 outline-none focus:border-blue-500"
+                        className="w-full p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold text-slate-900"
                       >
                         <option value="2010">جيل 2010</option>
                         <option value="2009">جيل 2009</option>
@@ -1230,7 +768,7 @@ export default function DashboardPage() {
                         onChange={(event) =>
                           setSemester(event.target.value)
                         }
-                        className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 outline-none focus:border-blue-500"
+                        className="w-full p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold text-slate-900"
                       >
                         <option value="الأول">الفصل الأول</option>
                         <option value="الثاني">الفصل الثاني</option>
@@ -1247,18 +785,16 @@ export default function DashboardPage() {
                         onChange={(event) =>
                           setSubject(event.target.value)
                         }
-                        className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 outline-none focus:border-blue-500"
+                        className="w-full p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold text-slate-900"
                       >
-                        {(subjectsByYear[year] || []).map(
-                          (subjectName) => (
-                            <option
-                              key={subjectName}
-                              value={subjectName}
-                            >
-                              {subjectName}
-                            </option>
-                          )
-                        )}
+                        {subjectsByYear[year].map((subjectName) => (
+                          <option
+                            key={subjectName}
+                            value={subjectName}
+                          >
+                            {subjectName}
+                          </option>
+                        ))}
                       </select>
                     </div>
 
@@ -1274,7 +810,7 @@ export default function DashboardPage() {
                             event.target.value as DossierType
                           )
                         }
-                        className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 outline-none focus:border-blue-500"
+                        className="w-full p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold text-slate-900"
                       >
                         <option value="مادة">مادة</option>
                         <option value="مكثف">مكثف</option>
@@ -1295,50 +831,48 @@ export default function DashboardPage() {
                           event.target.value as StationeryCategory
                         )
                       }
-                      className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 outline-none focus:border-blue-500"
+                      className="w-full p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold text-slate-900"
                     >
                       <option value="قرطاسية">قرطاسية</option>
-                      <option value="ألعاب">ألعاب</option>
                       <option value="أدوات">أدوات</option>
+                      <option value="ألعاب">ألعاب</option>
                     </select>
                   </div>
                 )}
 
                 <div>
                   <label className="block text-xs font-black text-slate-600 mb-1">
-                    صورة المنتج أو الدوسية
+                    صورة المنتج
                   </label>
 
-                  <div className="flex items-center gap-3">
-                    <label className="flex-1 cursor-pointer bg-slate-50 border border-dashed border-slate-300 hover:border-blue-500 rounded-xl p-3 text-center transition">
-                      <span className="text-xs font-bold text-slate-500 flex items-center justify-center gap-1.5">
-                        <Upload className="w-4 h-4 text-blue-600" />
-                        اختر صورة
-                      </span>
+                  <label className="cursor-pointer block p-4 rounded-xl border border-dashed border-slate-300 bg-slate-50 text-center">
+                    <span className="text-xs font-bold text-slate-500">
+                      <Upload className="w-4 h-4 inline-block ml-1 text-blue-600" />
+                      اختر صورة
+                    </span>
 
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={handleImageChange}
-                        className="hidden"
-                      />
-                    </label>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageChange}
+                      className="hidden"
+                    />
+                  </label>
 
-                    {imagePreview && (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={imagePreview}
-                        alt="معاينة الصورة"
-                        className="w-14 h-14 object-cover rounded-xl border border-slate-200"
-                      />
-                    )}
-                  </div>
+                  {imagePreview && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={imagePreview}
+                      alt="معاينة الصورة"
+                      className="w-20 h-20 object-cover rounded-xl mt-3 border border-slate-200"
+                    />
+                  )}
                 </div>
 
                 <button
                   type="submit"
                   disabled={loadingProducts}
-                  className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs transition shadow-sm disabled:opacity-50"
+                  className="w-full py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-black disabled:opacity-50"
                 >
                   {loadingProducts
                     ? "جاري الحفظ..."
@@ -1351,23 +885,23 @@ export default function DashboardPage() {
               <h2 className="text-lg font-black text-blue-950">
                 {activeTab === "dossiers"
                   ? `الدوسيات المتاحة (${filteredDossiers.length})`
-                  : `منتجات المتجر (${filteredStationery.length})`}
+                  : `المنتجات المتاحة (${filteredStationery.length})`}
               </h2>
 
               {activeTab === "dossiers" ? (
                 filteredDossiers.length === 0 ? (
-                  <div className="bg-white border border-blue-100 rounded-3xl p-12 text-center shadow-sm">
+                  <div className="bg-white border border-blue-100 rounded-3xl p-12 text-center">
                     <BookOpen className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-                    <p className="text-sm font-bold text-slate-500">
-                      لا توجد دوسيات مضافة حاليًا
+                    <p className="font-bold text-slate-500">
+                      لا توجد دوسيات مضافة.
                     </p>
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     {filteredDossiers.map((item) => (
                       <div
-                        key={item.id}
-                        className="bg-white border border-blue-100 rounded-2xl p-4 shadow-sm space-y-3 flex flex-col justify-between"
+                        key={String(item.id)}
+                        className="bg-white border border-blue-100 rounded-2xl p-4 shadow-sm space-y-3"
                       >
                         <div className="flex items-start gap-3">
                           {item.image ? (
@@ -1375,7 +909,7 @@ export default function DashboardPage() {
                             <img
                               src={item.image}
                               alt={item.title}
-                              className="w-16 h-16 object-cover rounded-xl border border-slate-100"
+                              className="w-16 h-16 object-cover rounded-xl"
                             />
                           ) : (
                             <div className="w-16 h-16 rounded-xl bg-slate-100 flex items-center justify-center">
@@ -1384,37 +918,34 @@ export default function DashboardPage() {
                           )}
 
                           <div className="flex-1 min-w-0">
-                            <span className="bg-blue-50 text-blue-700 text-[10px] font-black px-2 py-0.5 rounded">
+                            <span className="bg-blue-50 text-blue-700 text-[10px] font-black px-2 py-1 rounded">
                               {item.dossier_type || "دوسية"}
                             </span>
 
-                            <h3 className="font-bold text-sm text-blue-950 mt-1 break-words">
+                            <h3 className="font-bold text-sm text-blue-950 mt-2">
                               {item.title}
                             </h3>
 
                             <p className="text-xs text-slate-500 mt-1">
-                              {item.subject} - جيل {item.year}
+                              {item.subject || ""} - جيل {item.year || ""}
                             </p>
 
-                            <p className="text-xs text-slate-500">
-                              الفصل {item.semester}
+                            <p className="text-xs text-slate-500 mt-1">
+                              الفصل {item.semester || ""}
                             </p>
                           </div>
                         </div>
 
-                        <div className="flex items-center justify-between pt-3 border-t border-slate-100">
-                          <span className="font-black text-emerald-600 text-sm">
+                        <div className="flex items-center justify-between border-t border-slate-100 pt-3">
+                          <span className="font-black text-emerald-600">
                             {item.price} د.أ
                           </span>
 
                           <button
                             onClick={() =>
-                              handleDeleteProduct(
-                                item.id,
-                                "dossiers"
-                              )
+                              handleDeleteProduct(item.id, "dossiers")
                             }
-                            className="p-2 text-rose-500 hover:bg-rose-50 rounded-xl transition"
+                            className="p-2 rounded-xl text-rose-500 hover:bg-rose-50"
                             title="حذف"
                           >
                             <Trash2 className="w-4 h-4" />
@@ -1425,19 +956,18 @@ export default function DashboardPage() {
                   </div>
                 )
               ) : filteredStationery.length === 0 ? (
-                <div className="bg-white border border-blue-100 rounded-3xl p-12 text-center shadow-sm">
+                <div className="bg-white border border-blue-100 rounded-3xl p-12 text-center">
                   <ShoppingBag className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-
-                  <p className="text-sm font-bold text-slate-500">
-                    لا توجد منتجات مضافة حاليًا
+                  <p className="font-bold text-slate-500">
+                    لا توجد منتجات مضافة.
                   </p>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {filteredStationery.map((item) => (
                     <div
-                      key={item.id}
-                      className="bg-white border border-blue-100 rounded-2xl p-4 shadow-sm space-y-3 flex flex-col justify-between"
+                      key={String(item.id)}
+                      className="bg-white border border-blue-100 rounded-2xl p-4 shadow-sm space-y-3"
                     >
                       <div className="flex items-start gap-3">
                         {item.image ? (
@@ -1445,7 +975,7 @@ export default function DashboardPage() {
                           <img
                             src={item.image}
                             alt={item.title}
-                            className="w-16 h-16 object-cover rounded-xl border border-slate-100"
+                            className="w-16 h-16 object-cover rounded-xl"
                           />
                         ) : (
                           <div className="w-16 h-16 rounded-xl bg-slate-100 flex items-center justify-center">
@@ -1454,29 +984,26 @@ export default function DashboardPage() {
                         )}
 
                         <div className="flex-1 min-w-0">
-                          <span className="bg-purple-50 text-purple-700 text-[10px] font-black px-2 py-0.5 rounded">
-                            {item.category}
+                          <span className="bg-purple-50 text-purple-700 text-[10px] font-black px-2 py-1 rounded">
+                            {item.category || "منتج"}
                           </span>
 
-                          <h3 className="font-bold text-sm text-blue-950 mt-1 break-words">
+                          <h3 className="font-bold text-sm text-blue-950 mt-2">
                             {item.title}
                           </h3>
                         </div>
                       </div>
 
-                      <div className="flex items-center justify-between pt-3 border-t border-slate-100">
-                        <span className="font-black text-emerald-600 text-sm">
+                      <div className="flex items-center justify-between border-t border-slate-100 pt-3">
+                        <span className="font-black text-emerald-600">
                           {item.price} د.أ
                         </span>
 
                         <button
                           onClick={() =>
-                            handleDeleteProduct(
-                              item.id,
-                              "stationery"
-                            )
+                            handleDeleteProduct(item.id, "stationery")
                           }
-                          className="p-2 text-rose-500 hover:bg-rose-50 rounded-xl transition"
+                          className="p-2 rounded-xl text-rose-500 hover:bg-rose-50"
                           title="حذف"
                         >
                           <Trash2 className="w-4 h-4" />
@@ -1487,7 +1014,7 @@ export default function DashboardPage() {
                 </div>
               )}
             </div>
-          </div>
+          </section>
         )}
       </main>
     </div>
