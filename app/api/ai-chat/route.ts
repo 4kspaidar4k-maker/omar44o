@@ -1,29 +1,23 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
-// استدعاء المفاتيح بأمان من متغيرات البيئة لمنع حظر GitHub
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
+// مفتاح الذكاء الاصطناعي
+const GEMINI_API_KEY =
+  process.env.GEMINI_API_KEY ||
+  "AQ.Ab8RN6JZ58KXa5jNzL6q2SS7LuQ9Jrm6955zIeDV8W9P63YSDA";
+
+// بيانات قاعدة بيانات Supabase الخاصة بك
+const SUPABASE_URL =
+  process.env.NEXT_PUBLIC_SUPABASE_URL ||
+  "https://bkfcqlnyzpehhrwsnanm.supabase.co";
+
 const SUPABASE_KEY =
   process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+  "sb_publishable_AIwLFIIjhcUAU30U9A-Zqg_rgSLzjLU";
 
 export async function POST(req: Request) {
   try {
-    if (!GEMINI_API_KEY) {
-      return NextResponse.json(
-        { error: "مفتاح GEMINI_API_KEY غير متوفر في متغيرات البيئة." },
-        { status: 500 }
-      );
-    }
-
-    if (!SUPABASE_URL || !SUPABASE_KEY) {
-      return NextResponse.json(
-        { error: "بيانات الاتصال بـ Supabase غير متوفرة في متغيرات البيئة." },
-        { status: 500 }
-      );
-    }
-
     const { messages } = await req.json();
 
     if (!messages || !Array.isArray(messages)) {
@@ -33,7 +27,7 @@ export async function POST(req: Request) {
       );
     }
 
-    // 1. استدعاء المنتجات الحية من قاعدة بيانات Supabase
+    // 1. الاتصال بقاعدة البيانات وجلب المنتجات المتوفرة حالياً
     const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
     const { data: productsData, error: dbError } = await supabase
       .from("products")
@@ -48,7 +42,7 @@ export async function POST(req: Request) {
       );
     }
 
-    // 2. تجهيز وتنسيق قائمة المنتجات كمرجع للذكاء الاصطناعي
+    // 2. تجهيز وتنسيق قائمة المنتجات
     const products = productsData || [];
     let storeProductsText = "";
 
@@ -75,7 +69,7 @@ export async function POST(req: Request) {
         .join("\n");
     }
 
-    // 3. تحويل الرسائل لتنسيق Gemini API
+    // 3. تجهيز سجل الرسائل
     const formattedMessages = messages.map(
       (m: { role: string; content: string }) => ({
         role: m.role === "assistant" ? "model" : "user",
@@ -83,20 +77,19 @@ export async function POST(req: Request) {
       })
     );
 
-    // 4. إرسال الطلب مع الترويسة الصحيحة للمصادقة
+    // 4. إرسال الطلب للذكاء الاصطناعي مع المنتجات الفعلية
     const response = await fetch(
-      "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${GEMINI_API_KEY}`,
       {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-goog-api-key": GEMINI_API_KEY,
         },
         body: JSON.stringify({
           systemInstruction: {
             parts: [
               {
-                text: `أنت المساعد الذكي الرسمي لمكتبة أبو طوق في الأردن.
+                text: `أنت المساعد الذكي الرسمي لمكتبة أبو طوق.
 
 قواعد التعامل مع طلبات الزبائن:
 1. فهم العامية والبحث المرن: افهم الزبون كيفما كتب ("دوسيه"، "دوسية"، "ابحثلي عن"، "عندكو"، "بدي"). استخرج الكلمة المفتاحية (اسم المادة، اسم الأستاذ، أو اسم المنتج) وقارنها بالقائمة المرفقة.
@@ -104,7 +97,7 @@ export async function POST(req: Request) {
 3. التوافر: إذا كان المنتج موجوداً، جاوبه بلهجة أردنية لطيفة ومختصرة واذكر اسم المنتج وسعره المكتوب (مثال: "أه والله موجودة [اسم الدوسية] وسعرها [السعر] د.أ، بتحب نجهزلك إياها؟").
 4. عدم التوافر: إذا لم تجد أي كلمة قريبة أو مطابقة في القائمة، احكيله بوضوح: "لا والله، مش موجودة حالياً بالمكتبة".
 5. ممنوع التخمين: لا تخترع أسماء أو أسعار من عندك، واعتمد حصراً على القائمة.
-6. لا تفصح عن أي تفاصيل برمجية (مثل Supabase، API، أو قواعد البيانات) للمستخدم.
+6. لا تفصح عن أي تفاصيل برمجية (Supabase أو API أو قاعدة بيانات) للمستخدم.
 
 قائمة المتجر المتوفرة حالياً من قاعدة البيانات:
 ${storeProductsText}`,
@@ -121,7 +114,7 @@ ${storeProductsText}`,
     if (!response.ok) {
       console.error("Gemini API Error:", data);
       return NextResponse.json(
-        { error: data?.error?.message || "خطأ في الاتصال بنموذج الذكاء الاصطناعي" },
+        { error: data?.error?.message || "خطأ في الاتصال بالنموذج" },
         { status: response.status }
       );
     }

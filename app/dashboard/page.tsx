@@ -77,7 +77,7 @@ export default function DashboardPage() {
 
   const [year, setYear] = useState("2010");
   const [semester, setSemester] = useState("الأول");
-  const [subject, setSubject] = useState("الرياضيات");
+  const [subject, setSubject] = useState("رياضيات");
   const [dossierType, setDossierType] = useState<DossierType>("مادة");
 
   const [categoryType, setCategoryType] = useState<StationeryCategory>("قرطاسية");
@@ -926,7 +926,11 @@ export default function DashboardPage() {
                         <label className="block text-xs font-bold text-slate-600 mb-1">الجيل</label>
                         <select
                           value={year}
-                          onChange={(e) => setYear(e.target.value)}
+                          onChange={(e) => {
+                            const newYear = e.target.value;
+                            setYear(newYear);
+                            setSubject("رياضيات");
+                          }}
                           className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-900"
                         >
                           <option value="2010">جيل 2010</option>
@@ -953,11 +957,31 @@ export default function DashboardPage() {
                         onChange={(e) => setSubject(e.target.value)}
                         className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-900"
                       >
-                        <option value="الرياضيات">الرياضيات</option>
-                        <option value="اللغة العربية">اللغة العربية</option>
-                        <option value="اللغة الإنجليزية">اللغة الإنجليزية</option>
-                        <option value="التربية الإسلامية">التربية الإسلامية</option>
-                        <option value="تاريخ الأردن">تاريخ الأردن</option>
+                        {(year === "2009"
+                          ? [
+                              "رياضيات",
+                              "رياضيات أعمال",
+                              "لغة عربية",
+                              "اللغة الإنجليزية",
+                              "التربية الإسلامية",
+                              "تاريخ الأردن",
+                              "كيمياء",
+                              "فيزياء",
+                              "أحياء",
+                              "علوم أرض",
+                              "علم النفس",
+                            ]
+                          : [
+                              "رياضيات",
+                              "عربية",
+                              "تربية إسلامية",
+                              "تاريخ أردن",
+                            ]
+                        ).map((subjectName) => (
+                          <option key={subjectName} value={subjectName}>
+                            {subjectName}
+                          </option>
+                        ))}
                       </select>
                     </div>
 
