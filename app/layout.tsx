@@ -6,8 +6,8 @@ export const metadata: Metadata = {
   title: "مكتبة أبو طوق",
   description: "المتجر الإلكتروني لمكتبة أبو طوق - بطاقات ودوسيات وقرطاسية",
   icons: {
-    icon: "/logo.png",
-    apple: "/logo.png",
+    icon: "logo.png",
+    apple: "logo.png",
   },
   openGraph: {
     title: "مكتبة أبو طوق",
