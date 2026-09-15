@@ -28,7 +28,7 @@ export default function DossiersPage() {
   const [searchQuery, setSearchQuery] = useState("");
 
   /*
-   * تحميل كافة المنتجات والدوسيات من Supabase
+   * 1. جلب جميع المنتجات مباشرة بدون أي قيود على الـ Category
    */
   useEffect(() => {
     const loadDossiers = async () => {
@@ -96,45 +96,68 @@ export default function DossiersPage() {
     selectedYear === "2010" ? subjects2010 : subjects2009;
 
   /*
-   * فلترة الدوسيات
+   * دالة تنظيف النصوص لتسهيل المقارنة المريحة (تتجاهل "الـ" التعريف والهمزات والمسافات)
    */
-  const normalizedSearch = searchQuery.trim().toLowerCase();
+  const cleanStr = (str: any) => {
+    if (!str) return "";
+    return String(str)
+      .trim()
+      .toLowerCase()
+      .replace(/^(ال)/, "")
+      .replace(/[أإآ]/g, "ا")
+      .replace(/ة/g, "ه");
+  };
+
+  /*
+   * 2. فلترة مرنة وذكية متساهلة
+   */
+  const normalizedSearch = cleanStr(searchQuery);
 
   const filteredItems = dossiersList.filter((item) => {
+    // إذا استخدم المستخدم البحث السريع بالاسم
+    if (normalizedSearch) {
+      const titleClean = cleanStr(item.title);
+      const subjectClean = cleanStr(item.subject);
+      return (
+        titleClean.includes(normalizedSearch) ||
+        subjectClean.includes(normalizedSearch)
+      );
+    }
+
+    // أ) مطابقة الجيل: إذا لم يحدد الجيل في الداتا بيز يُعرض للجميع
     const yearMatch =
       !selectedYear ||
       !item.year ||
-      String(item.year) === String(selectedYear);
+      String(item.year).trim() === String(selectedYear).trim();
 
+    // ب) مطابقة الفصل
+    const itemSem = cleanStr(item.semester);
+    const targetSem = cleanStr(selectedSemester);
     const semesterMatch =
       !selectedSemester ||
       !item.semester ||
-      item.semester === selectedSemester ||
-      item.semester === `الفصل ${selectedSemester}` ||
-      (selectedSemester === "الأول" && item.semester === "الفصل الأول") ||
-      (selectedSemester === "الثاني" && item.semester === "الفصل الثاني");
+      itemSem.includes(targetSem);
 
+    // ج) مطابقة المادة
+    const itemSub = cleanStr(item.subject);
+    const targetSub = cleanStr(selectedSubject);
+    const titleClean = cleanStr(item.title);
     const subjectMatch =
       !selectedSubject ||
       !item.subject ||
-      item.subject === selectedSubject;
+      itemSub.includes(targetSub) ||
+      targetSub.includes(itemSub) ||
+      titleClean.includes(targetSub);
 
+    // د) مطابقة نوع الدوسية: متساهل جداً حتى لو كانت القيمة فارغة أو مختلفة قليلاً
+    const itemType = cleanStr(item.dossier_type);
+    const targetType = cleanStr(selectedDossierType);
     const typeMatch =
       !selectedDossierType ||
       !item.dossier_type ||
-      item.dossier_type === selectedDossierType;
-
-    const title = String(item.title || "").toLowerCase();
-    const subject = String(item.subject || "").toLowerCase();
-
-    const searchMatch =
-      !normalizedSearch ||
-      title.includes(normalizedSearch) ||
-      subject.includes(normalizedSearch);
-
-    if (normalizedSearch) {
-      return searchMatch;
-    }
+      itemType.includes(targetType) ||
+      targetType.includes(itemType) ||
+      titleClean.includes(targetType);
 
     return yearMatch && semesterMatch && subjectMatch && typeMatch;
   });
@@ -257,7 +280,7 @@ export default function DossiersPage() {
           </div>
         )}
 
-        {/* شريط البحث */}
+        {/* شريط البحث السريع */}
         <div className="relative mt-4 mb-2">
           <input
             type="text"
@@ -436,7 +459,7 @@ export default function DossiersPage() {
                           لا توجد دوسيات مضافة لهذه الخيارات حالياً.
                         </p>
                         <p className="text-xs mt-2 text-slate-400">
-                          تأكد من مطابقة المادة والجيل والنوع مع ما أضفته في لوحة التحكم.
+                          يمكنك البحث مباشرة عن اسم الدوسية في شريط البحث بالأعلى.
                         </p>
                       </div>
                     ) : (
