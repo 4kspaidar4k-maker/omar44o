@@ -67,7 +67,7 @@ const SUBJECTS_2009 = [
   "تربية إسلامية",
   "فيزياء",
   "كيمياء",
-  "حياء",
+  "أحياء",
   "علوم أرض",
 ];
 
@@ -369,19 +369,20 @@ export default function DashboardPage() {
     }
 
     const isDossier = activeTab === "dossiers";
-    // يحتاج خيار المسار فقط إذا كانت المادة من المواد التي تحتمل (متقدم / أعمال) مثل الرياضيات أو الإنجليزي في 2009
     const needsTrack =
       isDossier &&
       year === "2009" &&
       (subject === "رياضيات" || subject === "إنجليزي");
+
+    // دمج المسار في اسم المادة لمنع إرسال حقل track المنفصل
+    const finalSubject = needsTrack ? `${subject} (${track})` : subject;
 
     const newItem = {
       title: title.trim(),
       price: numericPrice,
       year: isDossier ? year : null,
       semester: isDossier ? semester : null,
-      subject: isDossier ? subject : null,
-      track: needsTrack ? track : null,
+      subject: isDossier ? finalSubject : null,
       dossier_type: isDossier ? dossierType : null,
       category: isDossier ? "دوسيات" : categoryType,
       image: imagePreview || null,
