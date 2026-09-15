@@ -2,19 +2,13 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
 // مفتاح الذكاء الاصطناعي
-const GEMINI_API_KEY =
-  process.env.GEMINI_API_KEY ||
-  "AQ.Ab8RN6JZ58KXa5jNzL6q2SS7LuQ9Jrm6955zIeDV8W9P63YSDA";
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 
-// بيانات قاعدة بيانات Supabase الخاصة بك
-const SUPABASE_URL =
-  process.env.NEXT_PUBLIC_SUPABASE_URL ||
-  "https://bkfcqlnyzpehhrwsnanm.supabase.co";
-
+// بيانات قاعدة بيانات Supabase
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SUPABASE_KEY =
   process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
-  "sb_publishable_AIwLFIIjhcUAU30U9A-Zqg_rgSLzjLU";
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
 export async function POST(req: Request) {
   try {
@@ -24,6 +18,13 @@ export async function POST(req: Request) {
       return NextResponse.json(
         { error: "الرسائل غير صحيحة أو غير متوفرة." },
         { status: 400 }
+      );
+    }
+
+    if (!GEMINI_API_KEY) {
+      return NextResponse.json(
+        { error: "مفتاح GEMINI_API_KEY غير معرف في متغيرات البيئة." },
+        { status: 500 }
       );
     }
 
@@ -100,7 +101,7 @@ export async function POST(req: Request) {
 4. إرفاق كرت المنتج: إذا لقيت المنتج المطلوب، جاوبه بسطرين قصار وأرفق كائن الـ JSON الخاص بالمنتج بآخر كلامك بالضبط بهاي الصيغة:
    <<<PRODUCT_DATA>>>{"id": "...", "title": "...", "price": 0, "image": "..."}<<<END_PRODUCT_DATA>>>
 5. غير متوفر: إذا طلب شيء مش موجود أبداً، احكيله بوضوح وبدون زيادة حكي: "لا والله يا غالي مش متوفرة حالياً بالمكتبة."
-6. ممنوع تأليف أسعار أو دوسيات من عندك، اعتمد فقط على قائمة المكتبة المرفقة below.
+6. ممنوع تأليف أسعار أو دوسيات من عندك، اعتمد فقط على قائمة المكتبة المرفقة أدناه.
 
 قائمة متجر مكتبة أبو طوق الحالية:
 ${storeProductsText}`,
@@ -126,15 +127,17 @@ ${storeProductsText}`,
       data?.candidates?.[0]?.content?.parts?.[0]?.text ||
       "أهلاً وسهلاً بيك، كيف بقدر أساعدك؟";
 
-    // استخراج بيانات المنتج للبطاقة إن وُجدت
+    // استخراج بيانات المنتج للبطاقة إن وُجدت (متوافق مع كل إصدارات TypeScript)
     let productData = null;
     let cleanReply = fullReply;
 
-    const match = fullReply.match(/<<<PRODUCT_DATA>>>(.*?)<<<END_PRODUCT_DATA>>>/s);
+    const regexPattern = /<<<PRODUCT_DATA>>>([\s\S]*?)<<<END_PRODUCT_DATA>>>/;
+    const match = fullReply.match(regexPattern);
+
     if (match && match[1]) {
       try {
         productData = JSON.parse(match[1].trim());
-        cleanReply = fullReply.replace(/<<<PRODUCT_DATA>>>(.*?)<<<END_PRODUCT_DATA>>>/s, "").trim();
+        cleanReply = fullReply.replace(regexPattern, "").trim();
       } catch (e) {
         console.error("خطأ في قراءة JSON المنتج:", e);
       }
