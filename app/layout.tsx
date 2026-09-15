@@ -4,15 +4,19 @@ import { CartProvider } from "../context/CartContext";
 
 export const metadata: Metadata = {
   title: "مكتبة أبو طوق",
-  description: "المتجر الإلكتروني لمكتبة أبو طوق - بطاقات ودوسيات وقرطاسية",
+  description:
+    "المتجر الإلكتروني لمكتبة أبو طوق - بطاقات ودوسيات وقرطاسية",
+
   icons: {
-    icon: "logo.png",
-    apple: "logo.png",
+    icon: "/logo.png",
+    apple: "/logo.png",
   },
+
   openGraph: {
     title: "مكتبة أبو طوق",
-    description: "المتجر الإلكتروني لمكتبة أبو طوق - بطاقات ودوسيات وقرطاسية",
-    url: "https://aputawqlibrary.vercel.app/", // 👈 استبدل هذا برابط موقعك الحقيقي على Vercel
+    description:
+      "المتجر الإلكتروني لمكتبة أبو طوق - بطاقات ودوسيات وقرطاسية",
+    url: "https://aputawqlibrary.vercel.app/",
     siteName: "مكتبة أبو طوق",
     images: [
       {
@@ -25,19 +29,21 @@ export const metadata: Metadata = {
     locale: "ar_JO",
     type: "website",
   },
+
   twitter: {
     card: "summary_large_image",
     title: "مكتبة أبو طوق",
-    description: "المتجر الإلكتروني لمكتبة أبو طوق - بطاقات ودوسيات وقرطاسية",
-    images: ["logo.png"],
+    description:
+      "المتجر الإلكتروني لمكتبة أبو طوق - بطاقات ودوسيات وقرطاسية",
+    images: ["/logo.png"],
   },
 };
 
 export default function RootLayout({
   children,
-}: {
+}: Readonly<{
   children: React.ReactNode;
-}) {
+}>) {
   return (
     <html lang="ar" dir="rtl">
       <body className="bg-slate-50 text-slate-900 min-h-screen">
