@@ -55,8 +55,21 @@ type Order = {
   items: OrderItem[];
 };
 
-// المواد الخاصة بجيل 2010 فقط
+// قائمة المواد المحددة لجيل 2010
 const SUBJECTS_2010 = ["رياضيات", "عربي", "تاريخ الأردن", "دين"];
+
+// قائمة المواد المحددة لجيل 2009
+const SUBJECTS_2009 = [
+  "رياضيات",
+  "إنجليزي",
+  "عربي",
+  "تاريخ الأردن",
+  "تربية إسلامية",
+  "فيزياء",
+  "كيمياء",
+  "حياء",
+  "علوم أرض",
+];
 
 export default function DashboardPage() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -77,10 +90,10 @@ export default function DashboardPage() {
   const [title, setTitle] = useState("");
   const [price, setPrice] = useState("");
 
-  const [year, setYear] = useState("2010");
+  const [year, setYear] = useState("2009");
   const [semester, setSemester] = useState("الأول");
   const [subject, setSubject] = useState("رياضيات");
-  const [track, setTrack] = useState("متقدم"); // متقدم / أعمال لجيل 2009
+  const [track, setTrack] = useState("متقدم"); // متقدم / أعمال
   const [dossierType, setDossierType] = useState<DossierType>("مادة");
 
   const [categoryType, setCategoryType] = useState<StationeryCategory>("قرطاسية");
@@ -93,10 +106,14 @@ export default function DashboardPage() {
 
   const normalizedSearch = searchQuery.trim().toLowerCase();
 
-  // ضبط أوتوماتيكي للمادة عند تغيير الجيل
+  // ضبط المادة تلقائياً حسب الجيل عند التبديل
   useEffect(() => {
     if (year === "2010") {
       if (!SUBJECTS_2010.includes(subject)) {
+        setSubject("رياضيات");
+      }
+    } else if (year === "2009") {
+      if (!SUBJECTS_2009.includes(subject)) {
         setSubject("رياضيات");
       }
     }
@@ -172,7 +189,7 @@ export default function DashboardPage() {
         audioContext.close().catch(() => {});
       }, 700);
     } catch (error) {
-      console.log("Notification sound could not play:", error);
+      console.log("Notification sound error:", error);
     }
   };
 
@@ -233,7 +250,7 @@ export default function DashboardPage() {
       }
     } catch (error: any) {
       console.error("LOAD PRODUCTS ERROR:", error);
-    } font-bold {
+    } finally {
       setLoadingProducts(false);
     }
   };
@@ -352,7 +369,11 @@ export default function DashboardPage() {
     }
 
     const isDossier = activeTab === "dossiers";
-    const needsTrack = isDossier && year === "2009" && (subject === "رياضيات" || subject === "إنجليزي" || subject === "انجليزي");
+    // يحتاج خيار المسار فقط إذا كانت المادة من المواد التي تحتمل (متقدم / أعمال) مثل الرياضيات أو الإنجليزي في 2009
+    const needsTrack =
+      isDossier &&
+      year === "2009" &&
+      (subject === "رياضيات" || subject === "إنجليزي");
 
     const newItem = {
       title: title.trim(),
@@ -915,29 +936,17 @@ export default function DashboardPage() {
                       <div className="grid grid-cols-2 gap-3">
                         <div>
                           <label className="block text-xs font-bold text-slate-600 mb-1">المادة</label>
-                          {year === "2010" ? (
-                            /* جيل 2010 - يظهر القائمة المحصورة بـ 4 مواد فقط */
-                            <select
-                              value={subject}
-                              onChange={(e) => setSubject(e.target.value)}
-                              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold outline-none focus:border-blue-600"
-                            >
-                              {SUBJECTS_2010.map((subj) => (
-                                <option key={subj} value={subj}>
-                                  {subj}
-                                </option>
-                              ))}
-                            </select>
-                          ) : (
-                            /* جيل 2009 - ادخال حُر أو مواد متعددة */
-                            <input
-                              type="text"
-                              placeholder="مثال: رياضيات"
-                              value={subject}
-                              onChange={(e) => setSubject(e.target.value)}
-                              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold outline-none focus:border-blue-600"
-                            />
-                          )}
+                          <select
+                            value={subject}
+                            onChange={(e) => setSubject(e.target.value)}
+                            className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold outline-none focus:border-blue-600"
+                          >
+                            {(year === "2010" ? SUBJECTS_2010 : SUBJECTS_2009).map((subj) => (
+                              <option key={subj} value={subj}>
+                                {subj}
+                              </option>
+                            ))}
+                          </select>
                         </div>
                         <div>
                           <label className="block text-xs font-bold text-slate-600 mb-1">نوع الدوسية</label>
@@ -953,17 +962,19 @@ export default function DashboardPage() {
                         </div>
                       </div>
 
-                      {/* خيار متقدم / أعمال عند اختيار جيل 2009 وللمواد المطلوبة */}
-                      {year === "2009" && (subject === "رياضيات" || subject === "إنجليزي" || subject === "انجليزي") && (
+                      {/* تحديد خيارات المسار لجيل 2009 للمواد المحددة فقط بدون كتابة يدوية */}
+                      {year === "2009" && (subject === "رياضيات" || subject === "إنجليزي") && (
                         <div>
-                          <label className="block text-xs font-bold text-slate-600 mb-1">المسار الدراسـي</label>
+                          <label className="block text-xs font-bold text-slate-600 mb-1">
+                            اختر المسار الخاص بالمادة
+                          </label>
                           <select
                             value={track}
                             onChange={(e) => setTrack(e.target.value)}
-                            className="w-full p-3 bg-blue-50/60 border border-blue-200 rounded-xl text-sm font-bold text-blue-900 outline-none focus:border-blue-600"
+                            className="w-full p-3 bg-blue-50/80 border border-blue-200 rounded-xl text-sm font-bold text-blue-900 outline-none focus:border-blue-600"
                           >
-                            <option value="متقدم">متقدم</option>
-                            <option value="أعمال">أعمال</option>
+                            <option value="متقدم">متقدم (مثال: {subject} متقدم)</option>
+                            <option value="أعمال">أعمال (مثال: {subject} أعمال)</option>
                           </select>
                         </div>
                       )}
@@ -1058,11 +1069,11 @@ export default function DashboardPage() {
                           {activeTab === "dossiers" ? (
                             <div className="flex flex-wrap gap-1 mt-1">
                               <span className="inline-block bg-blue-50 text-blue-700 text-[10px] font-bold px-2 py-0.5 rounded-md">
-                                {item.subject} | {item.year} | {item.semester}
+                                {item.subject} | {item.year} | {item.semester} | {item.dossier_type || "مادة"}
                               </span>
                               {item.track && (
                                 <span className="inline-block bg-amber-50 text-amber-700 text-[10px] font-bold px-1.5 py-0.5 rounded-md border border-amber-200">
-                                  {item.track}
+                                  مسار: {item.track}
                                 </span>
                               )}
                             </div>
