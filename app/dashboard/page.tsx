@@ -55,6 +55,36 @@ type Order = {
   items: OrderItem[];
 };
 
+// قائمة المواد المتاحة لجيل 2009 وجيل 2010
+const SUBJECTS_2009_2010 = [
+  "التربية الإسلامية",
+  "اللغة العربية (تخصص)",
+  "اللغة العربية (مهارات)",
+  "اللغة الإنجليزية",
+  "الرياضيات (علمي)",
+  "الرياضيات (أدبي)",
+  "الفيزياء",
+  "الكيمياء",
+  "الأحياء",
+  "علوم الأرض والبيئة",
+  "تاريخ الأردن",
+  "الجغرافيا",
+  "الحاسوب",
+  "العلوم المالية والمصرفية",
+];
+
+// قائمة المواد الافتراضية للأجيال الأخرى (2007، 2008)
+const SUBJECTS_OTHERS = [
+  "التربية الإسلامية",
+  "اللغة العربية",
+  "اللغة الإنجليزية",
+  "الرياضيات",
+  "الفيزياء",
+  "الكيمياء",
+  "الأحياء",
+  "تاريخ الأردن",
+];
+
 export default function DashboardPage() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [passwordInput, setPasswordInput] = useState("");
@@ -76,7 +106,7 @@ export default function DashboardPage() {
 
   const [year, setYear] = useState("2010");
   const [semester, setSemester] = useState("الأول");
-  const [subject, setSubject] = useState("رياضيات");
+  const [subject, setSubject] = useState("الرياضيات (علمي)");
   const [dossierType, setDossierType] = useState<DossierType>("مادة");
 
   const [categoryType, setCategoryType] = useState<StationeryCategory>("قرطاسية");
@@ -88,6 +118,16 @@ export default function DashboardPage() {
   const notificationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const normalizedSearch = searchQuery.trim().toLowerCase();
+
+  // تغيير المادة المحددة تلقائياً عند تغيير الجيل لتجنب خيارات غير منطقية
+  const handleYearChange = (selectedYear: string) => {
+    setYear(selectedYear);
+    if (selectedYear === "2009" || selectedYear === "2010") {
+      setSubject(SUBJECTS_2009_2010[0]);
+    } else {
+      setSubject(SUBJECTS_OTHERS[0]);
+    }
+  };
 
   const filteredDossiers = dossiers.filter((item: any) => {
     if (!normalizedSearch) return true;
@@ -217,11 +257,11 @@ export default function DashboardPage() {
           )
         );
       }
- } catch (error: any) {
-    console.error("LOAD PRODUCTS ERROR:", error);
-  } finally {
-    setLoadingProducts(false);
-  }
+    } catch (error: any) {
+      console.error("LOAD PRODUCTS ERROR:", error);
+    } finally {
+      setLoadingProducts(false);
+    }
   };
 
   const loadOrdersOnly = async (silent = false) => {
@@ -520,6 +560,8 @@ export default function DashboardPage() {
       </div>
     );
   }
+
+  const activeSubjectsList = (year === "2009" || year === "2010") ? SUBJECTS_2009_2010 : SUBJECTS_OTHERS;
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800">
@@ -876,7 +918,7 @@ export default function DashboardPage() {
                           <label className="block text-xs font-bold text-slate-600 mb-1">الجيل (السنة)</label>
                           <select
                             value={year}
-                            onChange={(e) => setYear(e.target.value)}
+                            onChange={(e) => handleYearChange(e.target.value)}
                             className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold outline-none focus:border-blue-600"
                           >
                             <option value="2007">2007</option>
@@ -901,13 +943,17 @@ export default function DashboardPage() {
                       <div className="grid grid-cols-2 gap-3">
                         <div>
                           <label className="block text-xs font-bold text-slate-600 mb-1">المادة</label>
-                          <input
-                            type="text"
-                            placeholder="مثال: رياضيات"
+                          <select
                             value={subject}
                             onChange={(e) => setSubject(e.target.value)}
                             className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold outline-none focus:border-blue-600"
-                          />
+                          >
+                            {activeSubjectsList.map((item, index) => (
+                              <option key={index} value={item}>
+                                {item}
+                              </option>
+                            ))}
+                          </select>
                         </div>
                         <div>
                           <label className="block text-xs font-bold text-slate-600 mb-1">نوع الدوسية</label>
