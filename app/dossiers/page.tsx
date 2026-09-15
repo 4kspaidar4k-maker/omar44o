@@ -41,7 +41,11 @@ export default function DossiersPage() {
         console.error("خطأ في تحميل الدوسيات:", error);
         setDossiersList([]);
       } else {
-        setDossiersList(data || []);
+        // تصفية فقط المنتجات الخاصة بالدوسيات
+        const dossiersOnly = (data || []).filter(
+          (item: any) => item.category === "دوسيات" || item.year || item.dossier_type
+        );
+        setDossiersList(dossiersOnly);
       }
 
       setLoading(false);
@@ -78,7 +82,6 @@ export default function DossiersPage() {
     "تاريخ الأردن",
   ];
 
-  // تم إزالة "الرياضيات أعمال" وإضافة المشتملات الأخرى
   const subjects2009 = [
     "الرياضيات",
     "اللغة العربية",
@@ -96,14 +99,16 @@ export default function DossiersPage() {
   const currentSubjects =
     selectedYear === "2010" ? subjects2010 : subjects2009;
 
+  // تنظيف النصوص بشكل دقيق لتطابق الأسماء بـ "الـ" التعريف وبدونها
   const cleanStr = (str: any) => {
     if (!str) return "";
     return String(str)
       .trim()
       .toLowerCase()
-      .replace(/^(ال)/, "")
       .replace(/[أإآ]/g, "ا")
-      .replace(/ة/g, "ه");
+      .replace(/ة/g, "ه")
+      .replace(/\s+/g, "")
+      .replace(/^(ال)/, "");
   };
 
   const normalizedSearch = cleanStr(searchQuery);
@@ -128,25 +133,27 @@ export default function DossiersPage() {
     const semesterMatch =
       !selectedSemester ||
       !item.semester ||
-      itemSem.includes(targetSem);
+      itemSem.includes(targetSem) ||
+      targetSem.includes(itemSem);
 
     const itemSub = cleanStr(item.subject);
     const targetSub = cleanStr(selectedSubject);
     const titleClean = cleanStr(item.title);
-    
-    // مطابقة المادة الفرعية (متقدم / أعمال) إن وجدت
-    const targetTrack = cleanStr(selectedSubTrack);
-    const trackMatch =
-      !selectedSubTrack ||
-      itemSub.includes(targetTrack) ||
-      titleClean.includes(targetTrack);
 
+    // مطابقة المادة المرغوبة مع المادة المحفوظة أو عنوان الدوسية
     const subjectMatch =
       !selectedSubject ||
       !item.subject ||
       itemSub.includes(targetSub) ||
       targetSub.includes(itemSub) ||
       titleClean.includes(targetSub);
+
+    // مطابقة المسار الفرعي (متقدم / أعمال)
+    const targetTrack = cleanStr(selectedSubTrack);
+    const trackMatch =
+      !selectedSubTrack ||
+      itemSub.includes(targetTrack) ||
+      titleClean.includes(targetTrack);
 
     const itemType = cleanStr(item.dossier_type);
     const targetType = cleanStr(selectedDossierType);
@@ -444,12 +451,12 @@ export default function DossiersPage() {
                       {["متقدم", "أعمال"].map((track) => (
                         <button
                           key={track}
-                          onClick={() => setSelectedSubTrack(`${selectedSubject} ${track}`)}
+                          onClick={() => setSelectedSubTrack(track)}
                           className="p-6 bg-white border border-blue-100 hover:border-blue-500 rounded-2xl shadow-sm hover:shadow-md transition text-right flex items-center justify-between group"
                         >
                           <div>
                             <h3 className="text-xl font-black text-blue-950 group-hover:text-blue-600 transition">
-                              {selectedSubject} {track}
+                              {selectedSubject} ({track})
                             </h3>
                             <p className="text-xs text-slate-400 mt-1">
                               عرض دوسيات مسار الـ {track}
@@ -491,7 +498,7 @@ export default function DossiersPage() {
                     <div className="flex items-center justify-between mb-5">
                       <div>
                         <h2 className="text-lg font-black text-blue-950">
-                          {selectedSubTrack || selectedSubject}
+                          {selectedSubject} {selectedSubTrack ? `(${selectedSubTrack})` : ""}
                         </h2>
                         <p className="text-sm text-slate-500 font-bold mt-1">
                           {selectedDossierType} — الفصل {selectedSemester} — جيل {selectedYear}
