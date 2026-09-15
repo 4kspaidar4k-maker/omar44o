@@ -55,35 +55,8 @@ type Order = {
   items: OrderItem[];
 };
 
-// قائمة المواد المتاحة لجيل 2009 وجيل 2010
-const SUBJECTS_2009_2010 = [
-  "التربية الإسلامية",
-  "اللغة العربية (تخصص)",
-  "اللغة العربية (مهارات)",
-  "اللغة الإنجليزية",
-  "الرياضيات (علمي)",
-  "الرياضيات (أدبي)",
-  "الفيزياء",
-  "الكيمياء",
-  "الأحياء",
-  "علوم الأرض والبيئة",
-  "تاريخ الأردن",
-  "الجغرافيا",
-  "الحاسوب",
-  "العلوم المالية والمصرفية",
-];
-
-// قائمة المواد الافتراضية للأجيال الأخرى (2007، 2008)
-const SUBJECTS_OTHERS = [
-  "التربية الإسلامية",
-  "اللغة العربية",
-  "اللغة الإنجليزية",
-  "الرياضيات",
-  "الفيزياء",
-  "الكيمياء",
-  "الأحياء",
-  "تاريخ الأردن",
-];
+// المواد الخاصة بجيل 2010 فقط
+const SUBJECTS_2010 = ["رياضيات", "عربي", "تاريخ الأردن", "دين"];
 
 export default function DashboardPage() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -106,7 +79,8 @@ export default function DashboardPage() {
 
   const [year, setYear] = useState("2010");
   const [semester, setSemester] = useState("الأول");
-  const [subject, setSubject] = useState("الرياضيات (علمي)");
+  const [subject, setSubject] = useState("رياضيات");
+  const [track, setTrack] = useState("متقدم"); // متقدم / أعمال لجيل 2009
   const [dossierType, setDossierType] = useState<DossierType>("مادة");
 
   const [categoryType, setCategoryType] = useState<StationeryCategory>("قرطاسية");
@@ -119,15 +93,14 @@ export default function DashboardPage() {
 
   const normalizedSearch = searchQuery.trim().toLowerCase();
 
-  // تغيير المادة المحددة تلقائياً عند تغيير الجيل لتجنب خيارات غير منطقية
-  const handleYearChange = (selectedYear: string) => {
-    setYear(selectedYear);
-    if (selectedYear === "2009" || selectedYear === "2010") {
-      setSubject(SUBJECTS_2009_2010[0]);
-    } else {
-      setSubject(SUBJECTS_OTHERS[0]);
+  // ضبط أوتوماتيكي للمادة عند تغيير الجيل
+  useEffect(() => {
+    if (year === "2010") {
+      if (!SUBJECTS_2010.includes(subject)) {
+        setSubject("رياضيات");
+      }
     }
-  };
+  }, [year, subject]);
 
   const filteredDossiers = dossiers.filter((item: any) => {
     if (!normalizedSearch) return true;
@@ -138,6 +111,7 @@ export default function DashboardPage() {
       item.semester,
       item.dossier_type,
       item.category,
+      item.track,
     ]
       .filter(Boolean)
       .some((value) => String(value).toLowerCase().includes(normalizedSearch));
@@ -259,7 +233,7 @@ export default function DashboardPage() {
       }
     } catch (error: any) {
       console.error("LOAD PRODUCTS ERROR:", error);
-    } finally {
+    } font-bold {
       setLoadingProducts(false);
     }
   };
@@ -378,6 +352,7 @@ export default function DashboardPage() {
     }
 
     const isDossier = activeTab === "dossiers";
+    const needsTrack = isDossier && year === "2009" && (subject === "رياضيات" || subject === "إنجليزي" || subject === "انجليزي");
 
     const newItem = {
       title: title.trim(),
@@ -385,6 +360,7 @@ export default function DashboardPage() {
       year: isDossier ? year : null,
       semester: isDossier ? semester : null,
       subject: isDossier ? subject : null,
+      track: needsTrack ? track : null,
       dossier_type: isDossier ? dossierType : null,
       category: isDossier ? "دوسيات" : categoryType,
       image: imagePreview || null,
@@ -560,8 +536,6 @@ export default function DashboardPage() {
       </div>
     );
   }
-
-  const activeSubjectsList = (year === "2009" || year === "2010") ? SUBJECTS_2009_2010 : SUBJECTS_OTHERS;
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800">
@@ -918,11 +892,9 @@ export default function DashboardPage() {
                           <label className="block text-xs font-bold text-slate-600 mb-1">الجيل (السنة)</label>
                           <select
                             value={year}
-                            onChange={(e) => handleYearChange(e.target.value)}
+                            onChange={(e) => setYear(e.target.value)}
                             className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold outline-none focus:border-blue-600"
                           >
-                            <option value="2007">2007</option>
-                            <option value="2008">2008</option>
                             <option value="2009">2009</option>
                             <option value="2010">2010</option>
                           </select>
@@ -943,17 +915,29 @@ export default function DashboardPage() {
                       <div className="grid grid-cols-2 gap-3">
                         <div>
                           <label className="block text-xs font-bold text-slate-600 mb-1">المادة</label>
-                          <select
-                            value={subject}
-                            onChange={(e) => setSubject(e.target.value)}
-                            className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold outline-none focus:border-blue-600"
-                          >
-                            {activeSubjectsList.map((item, index) => (
-                              <option key={index} value={item}>
-                                {item}
-                              </option>
-                            ))}
-                          </select>
+                          {year === "2010" ? (
+                            /* جيل 2010 - يظهر القائمة المحصورة بـ 4 مواد فقط */
+                            <select
+                              value={subject}
+                              onChange={(e) => setSubject(e.target.value)}
+                              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold outline-none focus:border-blue-600"
+                            >
+                              {SUBJECTS_2010.map((subj) => (
+                                <option key={subj} value={subj}>
+                                  {subj}
+                                </option>
+                              ))}
+                            </select>
+                          ) : (
+                            /* جيل 2009 - ادخال حُر أو مواد متعددة */
+                            <input
+                              type="text"
+                              placeholder="مثال: رياضيات"
+                              value={subject}
+                              onChange={(e) => setSubject(e.target.value)}
+                              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold outline-none focus:border-blue-600"
+                            />
+                          )}
                         </div>
                         <div>
                           <label className="block text-xs font-bold text-slate-600 mb-1">نوع الدوسية</label>
@@ -968,6 +952,21 @@ export default function DashboardPage() {
                           </select>
                         </div>
                       </div>
+
+                      {/* خيار متقدم / أعمال عند اختيار جيل 2009 وللمواد المطلوبة */}
+                      {year === "2009" && (subject === "رياضيات" || subject === "إنجليزي" || subject === "انجليزي") && (
+                        <div>
+                          <label className="block text-xs font-bold text-slate-600 mb-1">المسار الدراسـي</label>
+                          <select
+                            value={track}
+                            onChange={(e) => setTrack(e.target.value)}
+                            className="w-full p-3 bg-blue-50/60 border border-blue-200 rounded-xl text-sm font-bold text-blue-900 outline-none focus:border-blue-600"
+                          >
+                            <option value="متقدم">متقدم</option>
+                            <option value="أعمال">أعمال</option>
+                          </select>
+                        </div>
+                      )}
                     </>
                   ) : (
                     <div>
@@ -1057,9 +1056,16 @@ export default function DashboardPage() {
                           <h4 className="font-bold text-sm text-blue-950 truncate">{item.title}</h4>
                           <p className="text-xs font-black text-emerald-600 mt-0.5">{item.price} د.أ</p>
                           {activeTab === "dossiers" ? (
-                            <span className="inline-block bg-blue-50 text-blue-700 text-[10px] font-bold px-2 py-0.5 rounded-md mt-1">
-                              {item.subject} | {item.year} | {item.semester}
-                            </span>
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              <span className="inline-block bg-blue-50 text-blue-700 text-[10px] font-bold px-2 py-0.5 rounded-md">
+                                {item.subject} | {item.year} | {item.semester}
+                              </span>
+                              {item.track && (
+                                <span className="inline-block bg-amber-50 text-amber-700 text-[10px] font-bold px-1.5 py-0.5 rounded-md border border-amber-200">
+                                  {item.track}
+                                </span>
+                              )}
+                            </div>
                           ) : (
                             <span className="inline-block bg-slate-100 text-slate-600 text-[10px] font-bold px-2 py-0.5 rounded-md mt-1">
                               {item.category}
