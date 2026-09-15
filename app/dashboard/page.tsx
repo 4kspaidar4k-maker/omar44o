@@ -217,11 +217,11 @@ export default function DashboardPage() {
           )
         );
       }
-    } catch (error: any) {
-      console.error("LOAD PRODUCTS ERROR:", error);
-    } fontinally {
-      setLoadingProducts(false);
-    }
+ } catch (error: any) {
+    console.error("LOAD PRODUCTS ERROR:", error);
+  } finally {
+    setLoadingProducts(false);
+  }
   };
 
   const loadOrdersOnly = async (silent = false) => {
