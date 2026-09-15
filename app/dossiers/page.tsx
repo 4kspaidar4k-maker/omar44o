@@ -28,7 +28,7 @@ export default function DossiersPage() {
   const [searchQuery, setSearchQuery] = useState("");
 
   /*
-   * 1. جلب جميع المنتجات مباشرة بدون أي قيود على الـ Category
+   * 1. جلب جميع المنتجات مباشرة من قاعدة البيانات
    */
   useEffect(() => {
     const loadDossiers = async () => {
@@ -96,7 +96,7 @@ export default function DossiersPage() {
     selectedYear === "2010" ? subjects2010 : subjects2009;
 
   /*
-   * دالة تنظيف النصوص لتسهيل المقارنة المريحة (تتجاهل "الـ" التعريف والهمزات والمسافات)
+   * تنظيف النصوص لتسهيل المقارنة (تجاهل الهمزات و "الـ" التعريف)
    */
   const cleanStr = (str: any) => {
     if (!str) return "";
@@ -109,12 +109,11 @@ export default function DossiersPage() {
   };
 
   /*
-   * 2. فلترة مرنة وذكية متساهلة
+   * 2. فلترة المنتجات
    */
   const normalizedSearch = cleanStr(searchQuery);
 
   const filteredItems = dossiersList.filter((item) => {
-    // إذا استخدم المستخدم البحث السريع بالاسم
     if (normalizedSearch) {
       const titleClean = cleanStr(item.title);
       const subjectClean = cleanStr(item.subject);
@@ -124,13 +123,11 @@ export default function DossiersPage() {
       );
     }
 
-    // أ) مطابقة الجيل: إذا لم يحدد الجيل في الداتا بيز يُعرض للجميع
     const yearMatch =
       !selectedYear ||
       !item.year ||
       String(item.year).trim() === String(selectedYear).trim();
 
-    // ب) مطابقة الفصل
     const itemSem = cleanStr(item.semester);
     const targetSem = cleanStr(selectedSemester);
     const semesterMatch =
@@ -138,7 +135,6 @@ export default function DossiersPage() {
       !item.semester ||
       itemSem.includes(targetSem);
 
-    // ج) مطابقة المادة
     const itemSub = cleanStr(item.subject);
     const targetSub = cleanStr(selectedSubject);
     const titleClean = cleanStr(item.title);
@@ -149,7 +145,6 @@ export default function DossiersPage() {
       targetSub.includes(itemSub) ||
       titleClean.includes(targetSub);
 
-    // د) مطابقة نوع الدوسية: متساهل جداً حتى لو كانت القيمة فارغة أو مختلفة قليلاً
     const itemType = cleanStr(item.dossier_type);
     const targetType = cleanStr(selectedDossierType);
     const typeMatch =
