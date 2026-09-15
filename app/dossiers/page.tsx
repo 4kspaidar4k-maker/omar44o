@@ -23,13 +23,11 @@ export default function DossiersPage() {
   const [selectedYear, setSelectedYear] = useState<string | null>(null);
   const [selectedSemester, setSelectedSemester] = useState<string | null>(null);
   const [selectedSubject, setSelectedSubject] = useState<string | null>(null);
+  const [selectedSubTrack, setSelectedSubTrack] = useState<string | null>(null); // المسار: متقدم / أعمال
   const [selectedDossierType, setSelectedDossierType] = useState<string | null>(null);
 
   const [searchQuery, setSearchQuery] = useState("");
 
-  /*
-   * 1. جلب جميع المنتجات مباشرة من قاعدة البيانات
-   */
   useEffect(() => {
     const loadDossiers = async () => {
       setLoading(true);
@@ -55,6 +53,8 @@ export default function DossiersPage() {
   const handleBack = () => {
     if (selectedDossierType) {
       setSelectedDossierType(null);
+    } else if (selectedSubTrack) {
+      setSelectedSubTrack(null);
     } else if (selectedSubject) {
       setSelectedSubject(null);
     } else if (selectedSemester) {
@@ -78,9 +78,9 @@ export default function DossiersPage() {
     "تاريخ الأردن",
   ];
 
+  // تم إزالة "الرياضيات أعمال" وإضافة المشتملات الأخرى
   const subjects2009 = [
     "الرياضيات",
-    "الرياضيات أعمال",
     "اللغة العربية",
     "اللغة الإنجليزية",
     "التربية الإسلامية",
@@ -90,14 +90,12 @@ export default function DossiersPage() {
     "الأحياء",
     "علوم الأرض",
     "علم النفس",
+    "مالية",
   ];
 
   const currentSubjects =
     selectedYear === "2010" ? subjects2010 : subjects2009;
 
-  /*
-   * تنظيف النصوص لتسهيل المقارنة (تجاهل الهمزات و "الـ" التعريف)
-   */
   const cleanStr = (str: any) => {
     if (!str) return "";
     return String(str)
@@ -108,9 +106,6 @@ export default function DossiersPage() {
       .replace(/ة/g, "ه");
   };
 
-  /*
-   * 2. فلترة المنتجات
-   */
   const normalizedSearch = cleanStr(searchQuery);
 
   const filteredItems = dossiersList.filter((item) => {
@@ -138,6 +133,14 @@ export default function DossiersPage() {
     const itemSub = cleanStr(item.subject);
     const targetSub = cleanStr(selectedSubject);
     const titleClean = cleanStr(item.title);
+    
+    // مطابقة المادة الفرعية (متقدم / أعمال) إن وجدت
+    const targetTrack = cleanStr(selectedSubTrack);
+    const trackMatch =
+      !selectedSubTrack ||
+      itemSub.includes(targetTrack) ||
+      titleClean.includes(targetTrack);
+
     const subjectMatch =
       !selectedSubject ||
       !item.subject ||
@@ -154,16 +157,22 @@ export default function DossiersPage() {
       targetType.includes(itemType) ||
       titleClean.includes(targetType);
 
-    return yearMatch && semesterMatch && subjectMatch && typeMatch;
+    return yearMatch && semesterMatch && subjectMatch && trackMatch && typeMatch;
   });
 
   const resetAll = () => {
     setSelectedYear(null);
     setSelectedSemester(null);
     setSelectedSubject(null);
+    setSelectedSubTrack(null);
     setSelectedDossierType(null);
     setSearchQuery("");
   };
+
+  // التحقق إن كانت المادة تحتاج تحديد مسار (متقدم / أعمال) لجيل 2009
+  const needsTrackSelection =
+    selectedYear === "2009" &&
+    (selectedSubject === "الرياضيات" || selectedSubject === "اللغة الإنجليزية");
 
   return (
     <div dir="rtl" className="min-h-screen bg-slate-50 text-slate-800">
@@ -218,7 +227,7 @@ export default function DossiersPage() {
               onClick={resetAll}
               className="hover:text-blue-600 whitespace-nowrap"
             >
-              الأجيل
+              الأجيال
             </button>
 
             {selectedYear && (
@@ -228,6 +237,7 @@ export default function DossiersPage() {
                   onClick={() => {
                     setSelectedSemester(null);
                     setSelectedSubject(null);
+                    setSelectedSubTrack(null);
                     setSelectedDossierType(null);
                   }}
                   className="hover:text-blue-600 text-blue-900 whitespace-nowrap"
@@ -243,6 +253,7 @@ export default function DossiersPage() {
                 <button
                   onClick={() => {
                     setSelectedSubject(null);
+                    setSelectedSubTrack(null);
                     setSelectedDossierType(null);
                   }}
                   className="hover:text-blue-600 text-blue-900 whitespace-nowrap"
@@ -256,10 +267,25 @@ export default function DossiersPage() {
               <>
                 <ChevronLeft className="w-4 h-4 text-slate-400" />
                 <button
-                  onClick={() => setSelectedDossierType(null)}
+                  onClick={() => {
+                    setSelectedSubTrack(null);
+                    setSelectedDossierType(null);
+                  }}
                   className="hover:text-blue-600 text-blue-900 whitespace-nowrap"
                 >
                   {selectedSubject}
+                </button>
+              </>
+            )}
+
+            {selectedSubTrack && (
+              <>
+                <ChevronLeft className="w-4 h-4 text-slate-400" />
+                <button
+                  onClick={() => setSelectedDossierType(null)}
+                  className="hover:text-blue-600 text-blue-900 whitespace-nowrap"
+                >
+                  {selectedSubTrack}
                 </button>
               </>
             )}
@@ -275,7 +301,6 @@ export default function DossiersPage() {
           </div>
         )}
 
-        {/* شريط البحث السريع */}
         <div className="relative mt-4 mb-2">
           <input
             type="text"
@@ -302,7 +327,6 @@ export default function DossiersPage() {
 
         {!loading && (
           <>
-            {/* في حال البحث المباشر بالنص */}
             {searchQuery ? (
               <div>
                 <div className="flex items-center justify-between mb-4">
@@ -410,8 +434,36 @@ export default function DossiersPage() {
                   </div>
                 )}
 
+                {/* الخطوة 3.5: تحديد المسار (متقدم أم أعمال لجيل 2009) */}
+                {selectedYear && selectedSemester && selectedSubject && needsTrackSelection && !selectedSubTrack && (
+                  <div>
+                    <h2 className="text-lg font-black text-blue-950 mb-4">
+                      اختر مسار مادة ({selectedSubject}):
+                    </h2>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {["متقدم", "أعمال"].map((track) => (
+                        <button
+                          key={track}
+                          onClick={() => setSelectedSubTrack(`${selectedSubject} ${track}`)}
+                          className="p-6 bg-white border border-blue-100 hover:border-blue-500 rounded-2xl shadow-sm hover:shadow-md transition text-right flex items-center justify-between group"
+                        >
+                          <div>
+                            <h3 className="text-xl font-black text-blue-950 group-hover:text-blue-600 transition">
+                              {selectedSubject} {track}
+                            </h3>
+                            <p className="text-xs text-slate-400 mt-1">
+                              عرض دوسيات مسار الـ {track}
+                            </p>
+                          </div>
+                          <ChevronLeft className="w-6 h-6 text-blue-500 group-hover:translate-x-[-4px] transition" />
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {/* الخطوة 4: نوع الدوسية */}
-                {selectedYear && selectedSemester && selectedSubject && !selectedDossierType && (
+                {selectedYear && selectedSemester && selectedSubject && (!needsTrackSelection || selectedSubTrack) && !selectedDossierType && (
                   <div>
                     <h2 className="text-lg font-black text-blue-950 mb-4">
                       اختر نوع الدوسية:
@@ -434,12 +486,12 @@ export default function DossiersPage() {
                 )}
 
                 {/* الخطوة 5: عرض الدوسيات */}
-                {selectedYear && selectedSemester && selectedSubject && selectedDossierType && (
+                {selectedYear && selectedSemester && selectedSubject && (!needsTrackSelection || selectedSubTrack) && selectedDossierType && (
                   <div>
                     <div className="flex items-center justify-between mb-5">
                       <div>
                         <h2 className="text-lg font-black text-blue-950">
-                          {selectedSubject}
+                          {selectedSubTrack || selectedSubject}
                         </h2>
                         <p className="text-sm text-slate-500 font-bold mt-1">
                           {selectedDossierType} — الفصل {selectedSemester} — جيل {selectedYear}
@@ -475,7 +527,6 @@ export default function DossiersPage() {
   );
 }
 
-// بطاقة عرض الدوسية
 function DossierCard({ item, addToCart }: { item: any; addToCart: any }) {
   return (
     <div className="bg-white border border-blue-100 rounded-2xl overflow-hidden hover:border-blue-400 shadow-sm hover:shadow-md transition flex flex-col">
