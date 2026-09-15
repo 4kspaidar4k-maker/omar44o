@@ -12,7 +12,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "مكتبة أبو طوق",
     description: "المتجر الإلكتروني لمكتبة أبو طوق - بطاقات ودوسيات وقرطاسية",
-    url: "https://apu-tawq-library.vercel.app", // 👈 استبدل هذا برابط موقعك الحقيقي على Vercel
+    url: "https://aputawqlibrary.vercel.app/", // 👈 استبدل هذا برابط موقعك الحقيقي على Vercel
     siteName: "مكتبة أبو طوق",
     images: [
       {
@@ -29,7 +29,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "مكتبة أبو طوق",
     description: "المتجر الإلكتروني لمكتبة أبو طوق - بطاقات ودوسيات وقرطاسية",
-    images: ["/logo.png"],
+    images: ["logo.png"],
   },
 };
 
