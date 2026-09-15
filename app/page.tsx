@@ -17,7 +17,7 @@ export default function HomePage() {
 
   const navItems = [
     { title: "أدوات وقرطاسية", desc: "أقلام، دفاتر، ومستلزمات مدرسية ومكتبية", href: "/stationery", icon: ShoppingBag },
-    { title: "دوسيات وبطاقات", desc: "أحدث الدوسيات والبطاقات المعتمدة", href: "/dossiers", icon: BookOpen },
+    { title: "دوسيات ", desc: "أحدث الدوسيات والبطاقات المعتمدة", href: "/dossiers", icon: BookOpen },
     { title: "استفسار عند الذكاء الاصطناعي", desc: "إجابات فورية ودقيقة عن التوفر والأسعار", href: "/ai-chat", icon: Bot },
     { title: "اتصال وشكاوى", desc: "نحن هنا لخدمتك ومتابعة ملاحظاتك", href: "/contact", icon: PhoneCall },
     { title: "سلة الطلبات", desc: "مراجعة العناصر وإتمام عملية التوصيل", href: "/cart", icon: ShoppingCart },
