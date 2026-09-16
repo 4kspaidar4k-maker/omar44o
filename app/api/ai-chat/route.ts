@@ -1,20 +1,22 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
-// مفتاح الذكاء الاصطناعي
+// مفتاح الذكاء الاصطناعي Gemini
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 
-// بيانات قاعدة بيانات Supabase
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+// بيانات قاعدة بيانات Supabase (مع التأكد من وجود المفتاح الإفتراضي)
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
 const SUPABASE_KEY =
-  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+  process.env.SUPABASE_SERVICE_ROLE_KEY ||
+  "";
 
 export async function POST(req: Request) {
   try {
-    const { messages } = await req.json();
+    const body = await req.json();
+    const { messages } = body;
 
-    if (!messages || !Array.isArray(messages)) {
+    if (!messages || !Array.isArray(messages) || messages.length === 0) {
       return NextResponse.json(
         { error: "الرسائل غير صحيحة أو غير متوفرة." },
         { status: 400 }
@@ -22,77 +24,71 @@ export async function POST(req: Request) {
     }
 
     if (!GEMINI_API_KEY) {
+      console.error("Missing GEMINI_API_KEY");
       return NextResponse.json(
-        { error: "مفتاح GEMINI_API_KEY غير معرف في متغيرات البيئة." },
+        { error: "مفتاح GEMINI_API_KEY غير معرف في ملف .env.local" },
         { status: 500 }
       );
     }
 
-    // 1. الاتصال بقاعدة البيانات وجلب المنتجات المتوفرة حالياً
-    const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
-    const { data: productsData, error: dbError } = await supabase
-      .from("products")
-      .select("*")
-      .order("created_at", { ascending: false });
+    // 1. الاتصال بقاعدة البيانات وجلب المنتجات
+    let storeProductsText = "لا توجد أي منتجات مضافة في المتجر حالياً.";
 
-    if (dbError) {
-      console.error("Supabase Error:", dbError);
-      return NextResponse.json(
-        { error: `خطأ في استرجاع المنتجات: ${dbError.message}` },
-        { status: 500 }
-      );
-    }
+    if (SUPABASE_URL && SUPABASE_KEY) {
+      try {
+        const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+        const { data: productsData, error: dbError } = await supabase
+          .from("products")
+          .select("*")
+          .order("created_at", { ascending: false });
 
-    // 2. تجهيز قائمة المنتجات للذكاء الاصطناعي
-    const products = productsData || [];
-    let storeProductsText = "";
-
-    if (products.length === 0) {
-      storeProductsText = "لا توجد أي منتجات مضافة في المتجر حالياً.";
+        if (dbError) {
+          console.error("Supabase DB Error:", dbError.message);
+        } else if (productsData && productsData.length > 0) {
+          storeProductsText = productsData
+            .map((p) => {
+              const details = [
+                `ID: ${p.id}`,
+                `الاسم: ${p.title || p.name || "بدون اسم"}`,
+                `السعر: ${
+                  p.price !== null && p.price !== undefined
+                    ? `${p.price} د.أ`
+                    : "غير محدد"
+                }`,
+                `الصورة: ${p.image || ""}`,
+                `القسم: ${p.category || "عام"}`,
+              ];
+              if (p.subject) details.push(`المادة: ${p.subject}`);
+              if (p.year) details.push(`الجيل: ${p.year}`);
+              if (p.semester) details.push(`الفصل: ${p.semester}`);
+              if (p.dossier_type) details.push(`النوع: ${p.dossier_type}`);
+              return details.join(" | ");
+            })
+            .join("\n");
+        }
+      } catch (e) {
+        console.error("Supabase Connection Exception:", e);
+      }
     } else {
-      storeProductsText = products
-        .map((p) => {
-          const details = [
-            `ID: ${p.id}`,
-            `الاسم: ${p.title || "بدون اسم"}`,
-            `السعر: ${
-              p.price !== null && p.price !== undefined
-                ? `${p.price} د.أ`
-                : "غير محدد"
-            }`,
-            `الصورة: ${p.image || ""}`,
-            `القسم: ${p.category || "عام"}`,
-          ];
-          if (p.subject) details.push(`المادة: ${p.subject}`);
-          if (p.year) details.push(`الجيل: ${p.year}`);
-          if (p.semester) details.push(`الفصل: ${p.semester}`);
-          if (p.dossier_type) details.push(`النوع: ${p.dossier_type}`);
-          return details.join(" | ");
-        })
-        .join("\n");
+      console.warn("Supabase credentials missing or incomplete.");
     }
 
-    // 3. تجهيز سجل الرسائل
+    // 2. تجهيز سجل المحادثة بالشكل الصحيح
     const formattedMessages = messages.map(
       (m: { role: string; content: string }) => ({
-        role: m.role === "assistant" ? "model" : "user",
+        role: m.role === "assistant" || m.role === "model" ? "model" : "user",
         parts: [{ text: m.content }],
       })
     );
 
-    // 4. إرسال الطلب لـ Gemini مع التعليمات الأردنية والمختصرة
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          systemInstruction: {
-            parts: [
-              {
-                text: `أنت موظف في مكتبة "أبو طوق"، تحكي بلهجة أردنية عامية، مرتبة، ومختصرة جداً بدون كثرة حكي ولت وعجن.
+    // 3. إرسال الطلب إلى نموذج Gemini 2.0 Flash
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
+
+    const geminiPayload = {
+      systemInstruction: {
+        parts: [
+          {
+            text: `أنت موظف في مكتبة "أبو طوق"، تحكي بلهجة أردنية عامية، مرتبة، ومختصرة جداً بدون كثرة حكي ولت وعجن.
 
 قواعد شخصيتك وردك على الزبائن:
 1. الشخصية: احكي زي كأنك موظف أردني حقيقي بمكتبة (مثال: "أهلاً وسهلاً"، "هلا بيك"، "هلا معلم"، "أه والله موجودة"، "تفضل هيها"، "مش متوفرة حالياً والله").
@@ -105,20 +101,26 @@ export async function POST(req: Request) {
 
 قائمة متجر مكتبة أبو طوق الحالية:
 ${storeProductsText}`,
-              },
-            ],
           },
-          contents: formattedMessages,
-        }),
-      }
-    );
+        ],
+      },
+      contents: formattedMessages,
+    };
+
+    const response = await fetch(geminiUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(geminiPayload),
+    });
 
     const data = await response.json();
 
     if (!response.ok) {
-      console.error("Gemini API Error:", data);
+      console.error("Gemini API Error Detail:", JSON.stringify(data));
       return NextResponse.json(
-        { error: data?.error?.message || "خطأ في الاتصال بالنموذج" },
+        { error: data?.error?.message || "خطأ في الاتصال بنموذج الذكاء الاصطناعي" },
         { status: response.status }
       );
     }
@@ -127,7 +129,7 @@ ${storeProductsText}`,
       data?.candidates?.[0]?.content?.parts?.[0]?.text ||
       "أهلاً وسهلاً بيك، كيف بقدر أساعدك؟";
 
-    // استخراج بيانات المنتج للبطاقة إن وُجدت (متوافق مع كل إصدارات TypeScript)
+    // 4. استخراج بطاقة المنتج إن وُجدت
     let productData = null;
     let cleanReply = fullReply;
 
@@ -139,15 +141,15 @@ ${storeProductsText}`,
         productData = JSON.parse(match[1].trim());
         cleanReply = fullReply.replace(regexPattern, "").trim();
       } catch (e) {
-        console.error("خطأ في قراءة JSON المنتج:", e);
+        console.error("خطأ في تحليل JSON للمنتج:", e);
       }
     }
 
     return NextResponse.json({ reply: cleanReply, product: productData });
   } catch (error: any) {
-    console.error("Server Error:", error);
+    console.error("Server Route Error:", error);
     return NextResponse.json(
-      { error: error?.message || "حدث خطأ غير متوقع" },
+      { error: error?.message || "حدث خطأ غير متوقع في السيرفر" },
       { status: 500 }
     );
   }
