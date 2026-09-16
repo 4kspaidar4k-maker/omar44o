@@ -1,1106 +1,619 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
-
+import Image from "next/image";
 import {
   ArrowRight,
-  PlusCircle,
-  Trash2,
+  ShoppingCart,
+  Layers,
+  Calendar,
+  ChevronLeft,
+  Search,
   BookOpen,
-  ShoppingBag,
-  ClipboardList,
-  Upload,
-  MapPin,
-  Phone,
-  User,
-  Check,
-  Navigation,
-  Truck,
-  Clock,
-  Bell,
-  X,
 } from "lucide-react";
-
+import { useCart } from "../../context/CartContext";
 import { supabase } from "@/lib/supabase";
 
-type Tab = "dossiers" | "stationery" | "orders";
-type DossierType = "مادة" | "مكثف" | "بنك أسئلة";
-type StationeryCategory = "قرطاسية" | "أدوات" | "ألعاب";
-
-type OrderItem = {
-  id: string;
-  name: string;
+export interface DossierItem {
+  id: string | number;
+  title: string;
+  subject?: string;
+  year?: string | number;
+  semester?: string;
+  dossier_type?: string;
+  category?: string;
   price: number;
-  quantity: number;
-  image?: string | null;
-};
+  image?: string;
+}
 
-type Order = {
-  id: string;
-  created_at: string;
-  customer: string;
-  phone: string;
-  location?: string | null;
-  map_link?: string | null;
-  subtotal: number;
-  delivery_fee: number;
-  total: number;
-  status: string;
-  delete_after?: string | null;
-  items: OrderItem[];
-};
-
-const SUBJECTS_2010 = ["الرياضيات", "اللغة العربية", "تاريخ الأردن", "التربية الإسلامية"];
-const SUBJECTS_2009 = [
-  "الرياضيات",
-  "اللغة الإنجليزية",
-  "اللغة العربية",
-  "تاريخ الأردن",
-  "التربية الإسلامية",
-  "الفيزياء",
-  "الكيمياء",
-  "الأحياء",
-  "علوم الأرض",
+const SEMESTERS = [
+  { label: "الفصل الأول", value: "الأول" },
+  { label: "الفصل الثاني", value: "الثاني" },
 ];
 
-export default function DashboardPage() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [passwordInput, setPasswordInput] = useState("");
-  const [authError, setAuthError] = useState("");
+const DOSSIER_TYPES = ["مادة", "مكثف", "بنك أسئلة"];
 
-  const [activeTab, setActiveTab] = useState<Tab>("orders");
+const SUBJECTS_2010 = [
+  "الرياضيات",
+  "اللغة العربية",
+  "التربية الإسلامية",
+  "تاريخ الأردن",
+];
 
-  const [dossiers, setDossiers] = useState<any[]>([]);
-  const [stationery, setStationery] = useState<any[]>([]);
-  const [orders, setOrders] = useState<Order[]>([]);
+const SUBJECTS_2009 = [
+  "الرياضيات",
+  "اللغة العربية",
+  "اللغة الإنجليزية",
+  "التربية الإسلامية",
+  "تاريخ الأردن",
+  "الكيمياء",
+  "الفيزياء",
+  "الأحياء",
+  "علوم الأرض",
+  "علم النفس",
+  "مالية",
+];
 
-  const [loadingProducts, setLoadingProducts] = useState(false);
-  const [loadingOrders, setLoadingOrders] = useState(false);
+const cleanStr = (str?: string | number | null): string => {
+  if (!str) return "";
+  return String(str)
+    .trim()
+    .toLowerCase()
+    .replace(/[أإآ]/g, "ا")
+    .replace(/ة/g, "ه")
+    .replace(/\s+/g, "")
+    .replace(/^(ال)/, "");
+};
 
+export default function DossiersPage() {
+  const { addToCart, totalItems } = useCart();
+
+  const [dossiersList, setDossiersList] = useState<DossierItem[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const [selectedYear, setSelectedYear] = useState<string | null>(null);
+  const [selectedSemester, setSelectedSemester] = useState<string | null>(null);
+  const [selectedSubject, setSelectedSubject] = useState<string | null>(null);
+  const [selectedSubTrack, setSelectedSubTrack] = useState<string | null>(null);
+  const [selectedDossierType, setSelectedDossierType] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
 
-  const [title, setTitle] = useState("");
-  const [price, setPrice] = useState("");
-
-  const [year, setYear] = useState("2009");
-  const [semester, setSemester] = useState("الأول");
-  const [subject, setSubject] = useState("الرياضيات");
-  const [track, setTrack] = useState("متقدم");
-  const [dossierType, setDossierType] = useState<DossierType>("مادة");
-
-  const [categoryType, setCategoryType] = useState<StationeryCategory>("قرطاسية");
-  const [imagePreview, setImagePreview] = useState("");
-
-  const [notification, setNotification] = useState<{ id: string; customer: string } | null>(null);
-  const knownOrderIdsRef = useRef<Set<string>>(new Set());
-  const firstOrdersLoadRef = useRef(true);
-  const notificationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const normalizedSearch = searchQuery.trim().toLowerCase();
-
   useEffect(() => {
-    if (year === "2010") {
-      if (!SUBJECTS_2010.includes(subject)) {
-        setSubject("الرياضيات");
-      }
-    } else if (year === "2009") {
-      if (!SUBJECTS_2009.includes(subject)) {
-        setSubject("الرياضيات");
-      }
-    }
-  }, [year, subject]);
+    const loadDossiers = async () => {
+      setLoading(true);
 
-  const filteredDossiers = dossiers.filter((item: any) => {
-    if (!normalizedSearch) return true;
-    return [
-      item.title,
-      item.subject,
-      item.year,
-      item.semester,
-      item.dossier_type,
-      item.category,
-      item.track,
-    ]
-      .filter(Boolean)
-      .some((value) => String(value).toLowerCase().includes(normalizedSearch));
-  });
-
-  const filteredStationery = stationery.filter((item: any) => {
-    if (!normalizedSearch) return true;
-    return [item.title, item.category]
-      .filter(Boolean)
-      .some((value) => String(value).toLowerCase().includes(normalizedSearch));
-  });
-
-  const filteredOrders = orders.filter((order) => {
-    if (!normalizedSearch) return true;
-    const orderItems = order.items?.map((item) => item.name).join(" ") || "";
-    return [
-      order.id,
-      order.customer,
-      order.phone,
-      order.location,
-      order.status,
-      orderItems,
-    ]
-      .filter(Boolean)
-      .some((value) => String(value).toLowerCase().includes(normalizedSearch));
-  });
-
-  const isOrderExpired = (order: Order) => {
-    if (!order.delete_after) return false;
-    const deleteTime = new Date(order.delete_after).getTime();
-    return !Number.isNaN(deleteTime) && deleteTime <= Date.now();
-  };
-
-  const playNotificationSound = () => {
-    try {
-      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
-      if (!AudioContextClass) return;
-
-      const audioContext = new AudioContextClass();
-      const oscillator = audioContext.createOscillator();
-      const gainNode = audioContext.createGain();
-
-      oscillator.type = "sine";
-      oscillator.frequency.setValueAtTime(880, audioContext.currentTime);
-      oscillator.frequency.setValueAtTime(660, audioContext.currentTime + 0.15);
-
-      gainNode.gain.setValueAtTime(0.0001, audioContext.currentTime);
-      gainNode.gain.exponentialRampToValueAtTime(0.25, audioContext.currentTime + 0.02);
-      gainNode.gain.exponentialRampToValueAtTime(0.0001, audioContext.currentTime + 0.5);
-
-      oscillator.connect(gainNode);
-      gainNode.connect(audioContext.destination);
-
-      oscillator.start();
-      oscillator.stop(audioContext.currentTime + 0.5);
-
-      setTimeout(() => {
-        audioContext.close().catch(() => {});
-      }, 700);
-    } catch (error) {
-      console.log("Notification sound error:", error);
-    }
-  };
-
-  const showBrowserNotification = (order: Order) => {
-    try {
-      if (typeof window === "undefined" || !("Notification" in window)) return;
-      if (Notification.permission === "granted") {
-        new Notification("🔔 طلب جديد - مكتبة أبو طوق", {
-          body: `وصل طلب جديد من ${order.customer}`,
-          icon: "/favicon.ico",
-        });
-      }
-    } catch (error) {
-      console.log("Browser notification error:", error);
-    }
-  };
-
-  const showNewOrderNotification = (order: Order) => {
-    setNotification({ id: order.id, customer: order.customer });
-    playNotificationSound();
-    showBrowserNotification(order);
-
-    if (notificationTimerRef.current) clearTimeout(notificationTimerRef.current);
-    notificationTimerRef.current = setTimeout(() => setNotification(null), 8000);
-  };
-
-  const requestNotificationPermission = async () => {
-    try {
-      if (typeof window === "undefined" || !("Notification" in window)) return;
-      if (Notification.permission === "default") await Notification.requestPermission();
-    } catch (error) {
-      console.log("Notification permission error:", error);
-    }
-  };
-
-  const loadProductsOnly = async () => {
-    setLoadingProducts(true);
-    try {
       const { data, error } = await supabase
         .from("products")
         .select("*")
         .order("created_at", { ascending: false });
 
       if (error) {
-        console.error("SUPABASE PRODUCTS LOAD ERROR:", error);
-        alert("تعذر تحميل المنتجات: " + error.message);
+        console.error("خطأ في تحميل الدوسيات:", error);
+        setDossiersList([]);
       } else {
-        const allProducts = data || [];
-        setDossiers(
-          allProducts.filter(
-            (item: any) => item.category === "دوسيات" || item.year || item.dossier_type
-          )
+        const dossiersOnly = (data || []).filter(
+          (item: DossierItem) =>
+            item.category === "دوسيات" || item.year || item.dossier_type
         );
-        setStationery(
-          allProducts.filter(
-            (item: any) =>
-              item.category === "قرطاسية" ||
-              item.category === "أدوات" ||
-              item.category === "ألعاب"
-          )
-        );
+        setDossiersList(dossiersOnly);
       }
-    } catch (error: any) {
-      console.error("LOAD PRODUCTS ERROR:", error);
-    } finally {
-      setLoadingProducts(false);
-    }
-  };
 
-  const loadOrdersOnly = async (silent = false) => {
-    if (!silent) setLoadingOrders(true);
-    try {
-      const { data, error } = await supabase
-        .from("orders")
-        .select("*")
-        .order("created_at", { ascending: false });
-
-      if (error) {
-        console.error("SUPABASE ORDERS LOAD ERROR:", error);
-        if (!silent) alert("تعذر تحميل الطلبات: " + error.message);
-      } else {
-        const allOrders = (data || []) as Order[];
-        const expiredOrders = allOrders.filter((order) => isOrderExpired(order));
-
-        if (expiredOrders.length > 0) {
-          const expiredIds = expiredOrders.map((order) => order.id);
-          await supabase.from("orders").delete().in("id", expiredIds);
-        }
-
-        const activeOrders = allOrders.filter((order) => !isOrderExpired(order));
-        setOrders(activeOrders);
-
-        const currentIds = new Set(activeOrders.map((order) => order.id));
-
-        if (firstOrdersLoadRef.current) {
-          knownOrderIdsRef.current = currentIds;
-          firstOrdersLoadRef.current = false;
-        } else if (silent) {
-          const newlyArrivedOrders = activeOrders.filter(
-            (order) =>
-              (order.status === "قيد التجهيز والتوصيل" || order.status === "قيد التجهيز") &&
-              !knownOrderIdsRef.current.has(order.id)
-          );
-
-          knownOrderIdsRef.current = currentIds;
-
-          if (newlyArrivedOrders.length > 0) {
-            showNewOrderNotification(newlyArrivedOrders[0]);
-          }
-        } else {
-          knownOrderIdsRef.current = currentIds;
-        }
-      }
-    } catch (error: any) {
-      console.error("LOAD ORDERS ERROR:", error);
-    } finally {
-      if (!silent) setLoadingOrders(false);
-    }
-  };
-
-  useEffect(() => {
-    if (!isAuthenticated) return;
-
-    requestNotificationPermission();
-    loadProductsOnly();
-    loadOrdersOnly(false);
-  }, [isAuthenticated]);
-
-  useEffect(() => {
-    if (!isAuthenticated) return;
-
-    const interval = setInterval(() => {
-      loadOrdersOnly(true);
-    }, 180000);
-
-    return () => clearInterval(interval);
-  }, [isAuthenticated]);
-
-  useEffect(() => {
-    return () => {
-      if (notificationTimerRef.current) clearTimeout(notificationTimerRef.current);
+      setLoading(false);
     };
+
+    loadDossiers();
   }, []);
 
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (passwordInput === "201028") {
-      setIsAuthenticated(true);
-      setAuthError("");
-    } else {
-      setAuthError("كلمة المرور غير صحيحة.");
-    }
+  const handleBack = () => {
+    if (selectedDossierType) setSelectedDossierType(null);
+    else if (selectedSubTrack) setSelectedSubTrack(null);
+    else if (selectedSubject) setSelectedSubject(null);
+    else if (selectedSemester) setSelectedSemester(null);
+    else if (selectedYear) setSelectedYear(null);
   };
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onloadend = () => setImagePreview(reader.result as string);
-    reader.readAsDataURL(file);
+  const resetAll = () => {
+    setSelectedYear(null);
+    setSelectedSemester(null);
+    setSelectedSubject(null);
+    setSelectedSubTrack(null);
+    setSelectedDossierType(null);
+    setSearchQuery("");
   };
 
-  const handleAddItem = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const currentSubjects = selectedYear === "2010" ? SUBJECTS_2010 : SUBJECTS_2009;
 
-    if (!title.trim()) {
-      alert("اكتب اسم العنصر أولاً.");
-      return;
-    }
+  const needsTrackSelection =
+    selectedYear === "2009" &&
+    (selectedSubject === "الرياضيات" || selectedSubject === "اللغة الإنجليزية");
 
-    if (!price || Number.isNaN(Number(price))) {
-      alert("اكتب السعر بشكل صحيح.");
-      return;
-    }
+  const filteredItems = useMemo(() => {
+    const normalizedSearch = cleanStr(searchQuery);
 
-    const numericPrice = Number(price);
-    if (numericPrice < 0) {
-      alert("السعر لا يمكن أن يكون سالباً.");
-      return;
-    }
-
-    const isDossier = activeTab === "dossiers";
-
-    const needsTrack =
-      isDossier &&
-      year === "2009" &&
-      (subject === "الرياضيات" ||
-        subject === "اللغة الإنجليزية" ||
-        subject === "رياضيات" ||
-        subject === "إنجليزي");
-
-    let finalSubject = subject;
-    if (subject === "رياضيات") finalSubject = "الرياضيات";
-    if (subject === "إنجليزي") finalSubject = "اللغة الإنجليزية";
-
-    if (needsTrack) {
-      finalSubject = `${finalSubject} (${track})`;
-    }
-
-    const newItem = {
-      title: title.trim(),
-      price: numericPrice,
-      year: isDossier ? String(year) : null,
-      semester: isDossier ? semester : null,
-      subject: isDossier ? finalSubject : null,
-      track: isDossier && needsTrack ? track : null,
-      dossier_type: isDossier ? dossierType : null,
-      category: isDossier ? "دوسيات" : categoryType,
-      image: imagePreview || null,
-    };
-
-    setLoadingProducts(true);
-
-    try {
-      const { data, error } = await supabase.from("products").insert([newItem]).select().single();
-
-      if (error) {
-        console.error("SUPABASE INSERT ERROR:", error);
-        alert("لم يتم حفظ المنتج: " + error.message);
-        return;
+    return dossiersList.filter((item) => {
+      if (normalizedSearch) {
+        const titleClean = cleanStr(item.title);
+        const subjectClean = cleanStr(item.subject);
+        return (
+          titleClean.includes(normalizedSearch) ||
+          subjectClean.includes(normalizedSearch)
+        );
       }
 
-      if (isDossier) {
-        setDossiers((prev) => [data, ...prev]);
-      } else {
-        setStationery((prev) => [data, ...prev]);
-      }
+      const yearMatch =
+        !selectedYear ||
+        !item.year ||
+        String(item.year).trim() === String(selectedYear).trim();
 
-      setTitle("");
-      setPrice("");
-      setImagePreview("");
-      alert("تم حفظ المنتج ونشره بنجاح!");
-    } catch (error: any) {
-      console.error("UNEXPECTED INSERT ERROR:", error);
-      alert("حدث خطأ غير متوقع: " + (error?.message || ""));
-    } finally {
-      setLoadingProducts(false);
-    }
-  };
+      const itemSem = cleanStr(item.semester);
+      const targetSem = cleanStr(selectedSemester);
+      const semesterMatch =
+        !selectedSemester ||
+        !item.semester ||
+        itemSem.includes(targetSem) ||
+        targetSem.includes(itemSem);
 
-  const handleDelete = async (id: string, type: "dossiers" | "stationery") => {
-    if (!confirm("هل أنت متأكد من حذف هذا العنصر نهائياً؟")) return;
+      const itemSub = cleanStr(item.subject);
+      const targetSub = cleanStr(selectedSubject);
+      const titleClean = cleanStr(item.title);
 
-    try {
-      const { data, error } = await supabase.from("products").delete().eq("id", id).select("id");
+      const subjectMatch =
+        !selectedSubject ||
+        !item.subject ||
+        itemSub.includes(targetSub) ||
+        targetSub.includes(itemSub) ||
+        titleClean.includes(targetSub);
 
-      if (error) {
-        console.error("SUPABASE DELETE ERROR:", error);
-        alert("لم يتم حذف العنصر: " + error.message);
-        return;
-      }
+      const targetTrack = cleanStr(selectedSubTrack);
+      const trackMatch =
+        !selectedSubTrack ||
+        itemSub.includes(targetTrack) ||
+        titleClean.includes(targetTrack);
 
-      if (!data || data.length === 0) {
-        alert("لم يتم حذف العنصر. تأكد من إعدادات الحماية في Supabase.");
-        return;
-      }
+      const itemType = cleanStr(item.dossier_type);
+      const targetType = cleanStr(selectedDossierType);
+      const typeMatch =
+        !selectedDossierType ||
+        !item.dossier_type ||
+        itemType.includes(targetType) ||
+        targetType.includes(itemType) ||
+        titleClean.includes(targetType);
 
-      if (type === "dossiers") {
-        setDossiers((prev) => prev.filter((item) => item.id !== id));
-      } else {
-        setStationery((prev) => prev.filter((item) => item.id !== id));
-      }
-
-      alert("تم حذف العنصر بنجاح.");
-    } catch (error: any) {
-      console.error("UNEXPECTED DELETE ERROR:", error);
-      alert("حدث خطأ أثناء الحذف: " + (error?.message || ""));
-    }
-  };
-
-  const handleMarkAsReceived = async (orderId: string) => {
-    const order = orders.find((item) => item.id === orderId);
-    if (!order) return;
-
-    try {
-      const deleteAfter = new Date(Date.now() + 15 * 60 * 1000).toISOString();
-      const { data, error } = await supabase
-        .from("orders")
-        .update({ status: "تم الاستلام", delete_after: deleteAfter })
-        .eq("id", orderId)
-        .select("id,status,delete_after")
-        .maybeSingle();
-
-      if (error || !data) {
-        alert("تعذر تحديث حالة الطلب.");
-        return;
-      }
-
-      setOrders((prev) =>
-        prev.map((item) =>
-          item.id === orderId ? { ...item, status: "تم الاستلام", delete_after: deleteAfter } : item
-        )
-      );
-      knownOrderIdsRef.current.add(orderId);
-      if (notification?.id === orderId) setNotification(null);
-    } catch (error: any) {
-      alert("حدث خطأ أثناء استلام الطلب.");
-    }
-  };
-
-  const handleStartDelivery = async (orderId: string) => {
-    const order = orders.find((item) => item.id === orderId);
-    if (!order) return;
-
-    try {
-      const deleteAfter = new Date(Date.now() + 15 * 60 * 1000).toISOString();
-      const { data, error } = await supabase
-        .from("orders")
-        .update({ status: "جاري التوصيل", delete_after: deleteAfter })
-        .eq("id", orderId)
-        .select("id,status,delete_after")
-        .maybeSingle();
-
-      if (error || !data) {
-        alert("تعذر تغيير حالة الطلب.");
-        return;
-      }
-
-      setOrders((prev) =>
-        prev.map((item) =>
-          item.id === orderId ? { ...item, status: "جاري التوصيل", delete_after: deleteAfter } : item
-        )
-      );
-      knownOrderIdsRef.current.add(orderId);
-    } catch (error: any) {
-      alert("حدث خطأ أثناء بدء التوصيل.");
-    }
-  };
-
-  const handleDeleteOrder = async (orderId: string) => {
-    if (!confirm("هل أنت متأكد من مسح هذا الطلب نهائياً؟")) return;
-
-    try {
-      const { data, error } = await supabase.from("orders").delete().eq("id", orderId).select("id");
-
-      if (error || !data || data.length === 0) {
-        alert("تعذر حذف الطلب.");
-        return;
-      }
-
-      setOrders((prev) => prev.filter((order) => order.id !== orderId));
-      knownOrderIdsRef.current.delete(orderId);
-      if (notification?.id === orderId) setNotification(null);
-    } catch (error: any) {
-      alert("حدث خطأ أثناء حذف الطلب.");
-    }
-  };
-
-  if (!isAuthenticated) {
-    return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6 text-slate-800">
-        <div className="bg-white border border-blue-100 p-8 rounded-3xl max-w-md w-full shadow-lg">
-          <div className="text-center mb-6">
-            <h1 className="text-2xl font-black text-blue-950 mb-2">لوحة تحكم مكتبة أبو طوق</h1>
-            <p className="text-xs text-slate-500">أدخل كلمة المرور الخاصة بالإدارة</p>
-          </div>
-          <form onSubmit={handleLogin} className="space-y-4">
-            <input
-              type="password"
-              placeholder="كلمة المرور"
-              value={passwordInput}
-              onChange={(e) => setPasswordInput(e.target.value)}
-              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-center tracking-widest text-lg font-bold text-slate-900 outline-none focus:border-blue-600"
-            />
-            {authError && <p className="text-xs text-rose-600 text-center font-bold">{authError}</p>}
-            <button
-              type="submit"
-              className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition"
-            >
-              تسجيل الدخول
-            </button>
-          </form>
-          <div className="mt-6 text-center">
-            <Link href="/" className="text-xs text-slate-400 hover:text-blue-600 font-bold">
-              العودة للموقع الرئيسي
-            </Link>
-          </div>
-        </div>
-      </div>
-    );
-  }
+      return yearMatch && semesterMatch && subjectMatch && trackMatch && typeMatch;
+    });
+  }, [
+    dossiersList,
+    searchQuery,
+    selectedYear,
+    selectedSemester,
+    selectedSubject,
+    selectedSubTrack,
+    selectedDossierType,
+  ]);
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-800">
-      {/* إشعار الطلب الجديد */}
-      {notification && (
-        <div className="fixed top-5 left-1/2 -translate-x-1/2 z-[100] w-[calc(100%-32px)] max-w-md">
-          <div className="bg-white border-2 border-blue-500 rounded-2xl shadow-2xl p-4 flex items-center gap-3 animate-in slide-in-from-top duration-300">
-            <div className="w-11 h-11 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center shrink-0">
-              <Bell className="w-6 h-6 animate-bounce" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="font-black text-blue-950 text-sm">🔔 طلب جديد!</p>
-              <p className="text-xs text-slate-600 mt-1">
-                وصل طلب جديد من <strong className="text-blue-700">{notification.customer}</strong>
-              </p>
-              <button
-                onClick={() => {
-                  setNotification(null);
-                  setActiveTab("orders");
-                  setSearchQuery("");
-                  window.scrollTo({ top: 0, behavior: "smooth" });
-                }}
-                className="text-xs font-black text-blue-600 mt-2 hover:underline"
-              >
-                مشاهدة الطلب
-              </button>
-            </div>
-            <button
-              onClick={() => setNotification(null)}
-              className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400"
-              title="إغلاق"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* الرأس */}
+    <div dir="rtl" className="min-h-screen bg-slate-50 text-slate-800">
+      {/* HEADER */}
       <header className="sticky top-0 z-40 backdrop-blur-md bg-white/85 border-b border-blue-100 shadow-sm">
-        <div className="max-w-6xl mx-auto px-6 h-20 flex items-center justify-between">
+        <div className="max-w-5xl mx-auto px-6 h-20 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <Link href="/" className="p-2 rounded-full hover:bg-slate-100 text-blue-900 transition">
-              <ArrowRight className="w-6 h-6" />
-            </Link>
-            <h1 className="text-xl md:text-2xl font-black text-blue-950">إدارة مكتبة أبو طوق</h1>
+            {selectedYear || searchQuery ? (
+              <button
+                onClick={() => (searchQuery ? setSearchQuery("") : handleBack())}
+                className="p-2 rounded-full hover:bg-slate-100 text-blue-900 transition flex items-center gap-1 font-bold text-sm"
+              >
+                <ArrowRight className="w-5 h-5" />
+                <span>رجوع</span>
+              </button>
+            ) : (
+              <Link
+                href="/"
+                className="p-2 rounded-full hover:bg-slate-100 text-blue-900 transition"
+              >
+                <ArrowRight className="w-6 h-6" />
+              </Link>
+            )}
+
+            <h1 className="text-xl md:text-2xl font-black text-blue-950">
+              قسم الدوسيات والبطاقات
+            </h1>
           </div>
-          <button
-            onClick={() => setIsAuthenticated(false)}
-            className="px-4 py-2 bg-rose-50 text-rose-600 font-bold rounded-xl text-xs border border-rose-200"
+
+          <Link
+            href="/cart"
+            className="relative flex items-center justify-center p-3 rounded-full bg-blue-50 border border-blue-200 hover:bg-blue-100 transition shadow-sm"
           >
-            تسجيل الخروج
-          </button>
+            <ShoppingCart className="w-5 h-5 text-blue-900" />
+            {totalItems > 0 && (
+              <span className="absolute -top-1.5 -right-1.5 bg-blue-600 text-white text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center shadow">
+                {totalItems}
+              </span>
+            )}
+          </Link>
         </div>
       </header>
 
-      {/* التبويبات */}
-      <div className="max-w-6xl mx-auto px-6 mt-6">
-        <div className="grid grid-cols-3 gap-4">
-          <button
-            onClick={() => {
-              setActiveTab("orders");
-              setSearchQuery("");
-            }}
-            className={`p-4 rounded-2xl border font-bold text-sm md:text-base flex items-center justify-center gap-2 transition ${
-              activeTab === "orders"
-                ? "bg-blue-600 text-white border-blue-600 shadow-md"
-                : "bg-white text-blue-950 border-blue-100 hover:border-blue-300"
-            }`}
-          >
-            <ClipboardList className="w-5 h-5" />
-            <span>الطلبات ({orders.length})</span>
-          </button>
+      {/* BREADCRUMBS & SEARCH */}
+      <div className="max-w-5xl mx-auto px-6 pt-6">
+        {!searchQuery && (
+          <div className="flex items-center gap-2 text-xs md:text-sm text-slate-500 font-bold overflow-x-auto pb-2">
+            <button onClick={resetAll} className="hover:text-blue-600 whitespace-nowrap">
+              الأجيال
+            </button>
 
-          <button
-            onClick={() => {
-              setActiveTab("dossiers");
-              setSearchQuery("");
-            }}
-            className={`p-4 rounded-2xl border font-bold text-sm md:text-base flex items-center justify-center gap-2 transition ${
-              activeTab === "dossiers"
-                ? "bg-blue-600 text-white border-blue-600 shadow-md"
-                : "bg-white text-blue-950 border-blue-100 hover:border-blue-300"
-            }`}
-          >
-            <BookOpen className="w-5 h-5" />
-            <span>الدوسيات ({dossiers.length})</span>
-          </button>
+            {selectedYear && (
+              <>
+                <ChevronLeft className="w-4 h-4 text-slate-400" />
+                <button
+                  onClick={() => {
+                    setSelectedSemester(null);
+                    setSelectedSubject(null);
+                    setSelectedSubTrack(null);
+                    setSelectedDossierType(null);
+                  }}
+                  className="hover:text-blue-600 text-blue-900 whitespace-nowrap"
+                >
+                  جيل {selectedYear}
+                </button>
+              </>
+            )}
 
-          <button
-            onClick={() => {
-              setActiveTab("stationery");
-              setSearchQuery("");
-            }}
-            className={`p-4 rounded-2xl border font-bold text-sm md:text-base flex items-center justify-center gap-2 transition ${
-              activeTab === "stationery"
-                ? "bg-blue-600 text-white border-blue-600 shadow-md"
-                : "bg-white text-blue-950 border-blue-100 hover:border-blue-300"
-            }`}
-          >
-            <ShoppingBag className="w-5 h-5" />
-            <span>القرطاسية الألعاب ({stationery.length})</span>
-          </button>
-        </div>
-      </div>
+            {selectedSemester && (
+              <>
+                <ChevronLeft className="w-4 h-4 text-slate-400" />
+                <button
+                  onClick={() => {
+                    setSelectedSubject(null);
+                    setSelectedSubTrack(null);
+                    setSelectedDossierType(null);
+                  }}
+                  className="hover:text-blue-600 text-blue-900 whitespace-nowrap"
+                >
+                  الفصل {selectedSemester}
+                </button>
+              </>
+            )}
 
-      {/* شريط البحث */}
-      <div className="max-w-6xl mx-auto px-6 mt-5">
-        <div className="relative">
+            {selectedSubject && (
+              <>
+                <ChevronLeft className="w-4 h-4 text-slate-400" />
+                <button
+                  onClick={() => {
+                    setSelectedSubTrack(null);
+                    setSelectedDossierType(null);
+                  }}
+                  className="hover:text-blue-600 text-blue-900 whitespace-nowrap"
+                >
+                  {selectedSubject}
+                </button>
+              </>
+            )}
+
+            {selectedSubTrack && (
+              <>
+                <ChevronLeft className="w-4 h-4 text-slate-400" />
+                <button
+                  onClick={() => setSelectedDossierType(null)}
+                  className="hover:text-blue-600 text-blue-900 whitespace-nowrap"
+                >
+                  {selectedSubTrack}
+                </button>
+              </>
+            )}
+
+            {selectedDossierType && (
+              <>
+                <ChevronLeft className="w-4 h-4 text-slate-400" />
+                <span className="text-blue-600 whitespace-nowrap">
+                  {selectedDossierType}
+                </span>
+              </>
+            )}
+          </div>
+        )}
+
+        <div className="relative mt-4 mb-2">
           <input
-            type="search"
+            type="text"
+            placeholder="ابحث مباشرة عن اسم الدوسية أو المادة..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder={
-              activeTab === "orders"
-                ? "ابحث برقم الطلب أو اسم الزبون أو رقم الهاتف..."
-                : activeTab === "dossiers"
-                ? "ابحث عن دوسية أو مادة أو جيل..."
-                : "ابحث عن منتج أو قرطاسية أو أدوات أو ألعاب..."
-            }
-            className="w-full h-14 pr-5 pl-12 bg-white border border-blue-100 rounded-2xl shadow-sm text-sm font-bold text-slate-900 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition placeholder:text-slate-400"
+            className="w-full pl-12 pr-4 py-3.5 bg-white border border-blue-200 rounded-2xl outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition shadow-sm text-sm font-bold text-blue-950"
           />
-          {searchQuery && (
-            <button
-              type="button"
-              onClick={() => setSearchQuery("")}
-              className="absolute left-4 top-1/2 -translate-y-1/2 p-1.5 rounded-full hover:bg-slate-100 text-slate-400 transition"
-              title="مسح البحث"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          )}
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
         </div>
       </div>
 
-      {/* المحتوى الرئيسي */}
-      <main className="max-w-6xl mx-auto px-6 py-8">
-        {activeTab === "orders" ? (
-          <div className="space-y-6">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xl font-black text-blue-950">
-                طلبات التوصيل الواردة (تحديث تلقائي كل 3 دقائق)
+      <main className="max-w-5xl mx-auto px-6 py-6">
+        {loading ? (
+          <div className="bg-white border border-blue-100 rounded-2xl p-10 text-center shadow-sm">
+            <div className="animate-pulse">
+              <BookOpen className="w-10 h-10 mx-auto text-blue-400 mb-3" />
+              <p className="font-bold text-slate-500">جاري تحميل الدوسيات...</p>
+            </div>
+          </div>
+        ) : searchQuery ? (
+          <div>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-black text-blue-950">
+                نتائج البحث عن: &quot;{searchQuery}&quot; ({filteredItems.length})
               </h2>
               <button
-                onClick={() => loadOrdersOnly(false)}
-                disabled={loadingOrders}
-                className="text-xs bg-white border border-slate-200 px-3 py-1.5 rounded-lg font-bold hover:bg-slate-50 transition disabled:opacity-50"
+                onClick={() => setSearchQuery("")}
+                className="text-xs font-bold text-blue-600 hover:underline"
               >
-                {loadingOrders ? "جاري التحديث..." : "تحديث الطلبات يدوياً"}
+                إلغاء البحث
               </button>
             </div>
 
-            {filteredOrders.length === 0 ? (
-              <div className="bg-white border border-blue-100 rounded-3xl p-12 text-center shadow-sm">
-                <ClipboardList className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-                <h3 className="text-lg font-bold text-slate-600">
-                  {searchQuery ? "لا توجد نتائج مطابقة" : "لا توجد طلبات"}
-                </h3>
+            {filteredItems.length === 0 ? (
+              <div className="bg-white border border-blue-100 rounded-2xl p-8 text-center text-slate-500 shadow-sm">
+                <p className="font-bold">لا توجد دوسيات مطابقة لبحثك.</p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 gap-6">
-                {filteredOrders.map((order) => {
-                  const orderDate = order.created_at
-                    ? new Date(order.created_at).toLocaleString("ar-JO")
-                    : "بدون تاريخ";
-                  const isPending =
-                    order.status === "قيد التجهيز والتوصيل" || order.status === "قيد التجهيز";
-                  const isReceived = order.status === "تم الاستلام";
-                  const isDelivery = order.status === "جاري التوصيل";
-
-                  return (
-                    <div
-                      key={order.id}
-                      className={`bg-white border rounded-3xl p-6 shadow-sm space-y-4 transition ${
-                        isPending
-                          ? "border-amber-200"
-                          : isReceived
-                          ? "border-emerald-200"
-                          : "border-blue-200"
-                      }`}
-                    >
-                      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 pb-4">
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="bg-blue-100 text-blue-900 text-xs font-black px-2.5 py-1 rounded-md">
-                              {order.id}
-                            </span>
-                            <span className="text-xs text-slate-400">{orderDate}</span>
-                            {isPending && (
-                              <span className="flex items-center gap-1 bg-amber-100 text-amber-900 text-xs font-black px-2.5 py-1 rounded-md animate-pulse">
-                                <Clock className="w-3.5 h-3.5" />
-                                بانتظار الاستلام
-                              </span>
-                            )}
-                            {isReceived && (
-                              <span className="flex items-center gap-1 bg-emerald-100 text-emerald-800 text-xs font-black px-2.5 py-1 rounded-md">
-                                <Check className="w-3.5 h-3.5" />
-                                تم الاستلام
-                              </span>
-                            )}
-                            {isDelivery && (
-                              <span className="flex items-center gap-1 bg-blue-100 text-blue-800 text-xs font-black px-2.5 py-1 rounded-md">
-                                <Truck className="w-3.5 h-3.5" />
-                                جاري التوصيل
-                              </span>
-                            )}
-                          </div>
-                          <h3 className="text-lg font-black text-blue-950 flex items-center gap-2 mt-1">
-                            <User className="w-4 h-4 text-blue-600" />
-                            <span>{order.customer}</span>
-                          </h3>
-                        </div>
-
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <a
-                            href={`tel:${order.phone}`}
-                            className="flex items-center gap-1.5 px-3.5 py-2 bg-slate-100 text-slate-800 border border-slate-200 font-bold rounded-xl text-xs hover:bg-slate-200 transition"
-                          >
-                            <Phone className="w-3.5 h-3.5 text-blue-600" />
-                            <span>{order.phone}</span>
-                          </a>
-                          {isPending && (
-                            <button
-                              onClick={() => handleMarkAsReceived(order.id)}
-                              className="px-4 py-2 bg-emerald-600 text-white font-bold rounded-xl text-xs hover:bg-emerald-700 transition flex items-center gap-1 shadow-sm"
-                            >
-                              <Check className="w-4 h-4" />
-                              <span>تم الاستلام</span>
-                            </button>
-                          )}
-                          {isReceived && (
-                            <button
-                              onClick={() => handleStartDelivery(order.id)}
-                              className="px-4 py-2 bg-blue-600 text-white font-bold rounded-xl text-xs hover:bg-blue-700 transition flex items-center gap-1 shadow-sm"
-                            >
-                              <Truck className="w-4 h-4" />
-                              <span>جارٍ التوصيل</span>
-                            </button>
-                          )}
-                          <button
-                            onClick={() => handleDeleteOrder(order.id)}
-                            className="p-2 text-rose-500 hover:bg-rose-50 rounded-xl border border-rose-100 transition"
-                            title="حذف الطلب نهائياً"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </div>
-
-                      <div className="bg-amber-50/80 border border-amber-200 rounded-2xl p-4 space-y-3 text-amber-950">
-                        <div className="flex items-start gap-2">
-                          <MapPin className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
-                          <div className="flex-1">
-                            <strong className="text-xs block font-black text-amber-900">موقع الاستلام:</strong>
-                            <p className="text-sm font-medium mt-0.5">{order.location || "عبر الخريطة"}</p>
-                          </div>
-                        </div>
-                        {order.map_link && (
-                          <div className="pt-2 border-t border-amber-200/60 flex items-center justify-between gap-3 flex-wrap">
-                            <span className="text-xs font-bold text-amber-900">إحداثيات الـ GPS:</span>
-                            <a
-                              href={order.map_link}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-black rounded-xl transition shadow-sm"
-                            >
-                              <Navigation className="w-3.5 h-3.5" />
-                              <span>فتح الموقع على خرائط قوقل</span>
-                            </a>
-                          </div>
-                        )}
-                      </div>
-
-                      <div>
-                        <h4 className="text-xs font-black text-slate-500 mb-2">المنتجات المطلوبة:</h4>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                          {order.items?.map((item, i) => (
-                            <div
-                              key={i}
-                              className="flex items-center gap-3 p-3 bg-slate-50 border border-slate-200 rounded-xl"
-                            >
-                              {item.image ? (
-                                // eslint-disable-next-line @next/next/no-img-element
-                                <img
-                                  src={item.image}
-                                  alt={item.name}
-                                  className="w-14 h-14 object-cover rounded-lg border border-slate-200"
-                                />
-                              ) : (
-                                <div className="w-14 h-14 rounded-lg bg-slate-200 flex items-center justify-center shrink-0">
-                                  <ShoppingBag className="w-5 h-5 text-slate-400" />
-                                </div>
-                              )}
-                              <div>
-                                <p className="font-bold text-xs text-blue-950 line-clamp-1">{item.name}</p>
-                                <p className="text-xs font-black text-blue-700 mt-1">الكمية: {item.quantity} حبة</p>
-                                <p className="text-[11px] text-slate-500">السعر: {item.price} د.أ</p>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-
-                      <div className="flex items-center justify-between pt-3 border-t border-slate-100 text-xs font-bold text-slate-600">
-                        <div>
-                          <span>المجموع: {order.subtotal} د.أ</span>
-                          <span className="mx-2">|</span>
-                          <span>التوصيل: {order.delivery_fee} د.أ</span>
-                        </div>
-                        <div className="text-sm font-black text-blue-950">
-                          الإجمالي: {order.total} د.أ
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                {filteredItems.map((item) => (
+                  <DossierCard key={item.id} item={item} addToCart={addToCart} />
+                ))}
               </div>
             )}
           </div>
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* نموذج إضافة عنصر جديد */}
-            <div className="lg:col-span-1 bg-white border border-blue-100 rounded-3xl p-6 shadow-sm h-fit space-y-6">
-              <h3 className="text-lg font-black text-blue-950 flex items-center gap-2">
-                <PlusCircle className="w-5 h-5 text-blue-600" />
-                <span>
-                  {activeTab === "dossiers" ? "إضافة دوسية جديدة" : "إضافة قرطاسية أو ألعاب"}
-                </span>
-              </h3>
-
-              <form onSubmit={handleAddItem} className="space-y-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1">
-                    اسم المنتج / العنصر
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                    placeholder="مثال: دوسية الرياضيات الفصل الأول"
-                    className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-900 outline-none focus:border-blue-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1">
-                    السعر (بالدينار الأردني)
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    required
-                    value={price}
-                    onChange={(e) => setPrice(e.target.value)}
-                    placeholder="مثال: 3.50"
-                    className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-900 outline-none focus:border-blue-500"
-                  />
-                </div>
-
-                {activeTab === "dossiers" ? (
-                  <>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-xs font-bold text-slate-600 mb-1">الجيل</label>
-                        <select
-                          value={year}
-                          onChange={(e) => setYear(e.target.value)}
-                          className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-900 outline-none focus:border-blue-500"
-                        >
-                          <option value="2009">2009</option>
-                          <option value="2010">2010</option>
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-bold text-slate-600 mb-1">الفصل</label>
-                        <select
-                          value={semester}
-                          onChange={(e) => setSemester(e.target.value)}
-                          className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-900 outline-none focus:border-blue-500"
-                        >
-                          <option value="الأول">الأول</option>
-                          <option value="الثاني">الثاني</option>
-                        </select>
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-bold text-slate-600 mb-1">المادة</label>
-                      <select
-                        value={subject}
-                        onChange={(e) => setSubject(e.target.value)}
-                        className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-900 outline-none focus:border-blue-500"
-                      >
-                        {(year === "2010" ? SUBJECTS_2010 : SUBJECTS_2009).map((sub) => (
-                          <option key={sub} value={sub}>
-                            {sub}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {year === "2009" && (subject.includes("الرياضيات") || subject.includes("اللغة الإنجليزية") || subject.includes("رياضيات") || subject.includes("إنجليزي")) && (
-                      <div>
-                        <label className="block text-xs font-bold text-slate-600 mb-1">المسار</label>
-                        <select
-                          value={track}
-                          onChange={(e) => setTrack(e.target.value)}
-                          className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-900 outline-none focus:border-blue-500"
-                        >
-                          <option value="متقدم">متقدم</option>
-                          <option value="أعمال">أعمال</option>
-                        </select>
-                      </div>
-                    )}
-
-                    <div>
-                      <label className="block text-xs font-bold text-slate-600 mb-1">نوع الدوسية</label>
-                      <select
-                        value={dossierType}
-                        onChange={(e) => setDossierType(e.target.value as DossierType)}
-                        className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-900 outline-none focus:border-blue-500"
-                      >
-                        <option value="مادة">مادة</option>
-                        <option value="مكثف">مكثف</option>
-                        <option value="بنك أسئلة">بنك أسئلة</option>
-                      </select>
-                    </div>
-                  </>
-                ) : (
-                  <div>
-                    <label className="block text-xs font-bold text-slate-600 mb-1">التصنيف</label>
-                    <select
-                      value={categoryType}
-                      onChange={(e) => setCategoryType(e.target.value as StationeryCategory)}
-                      className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-900 outline-none focus:border-blue-500"
+          <>
+            {/* Step 1: Year */}
+            {!selectedYear && (
+              <div>
+                <h2 className="text-lg font-black text-blue-950 mb-4">
+                  اختر الجيل الدراسي:
+                </h2>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {["2010", "2009"].map((year) => (
+                    <button
+                      key={year}
+                      onClick={() => setSelectedYear(year)}
+                      className="p-6 bg-white border border-blue-100 hover:border-blue-500 rounded-2xl shadow-sm hover:shadow-md transition text-right flex items-center justify-between group"
                     >
-                      <option value="قرطاسية">قرطاسية</option>
-                      <option value="أدوات">أدوات</option>
-                      <option value="ألعاب">ألعاب</option>
-                    </select>
-                  </div>
-                )}
+                      <div>
+                        <h3 className="text-2xl font-black text-blue-950 group-hover:text-blue-600 transition">
+                          دوسيات جيل {year}
+                        </h3>
+                        <p className="text-xs text-slate-400 mt-1">
+                          تصفح مواد الدعم والمناهج الخاصة بهذا الجيل
+                        </p>
+                      </div>
+                      <Layers className="w-8 h-8 text-blue-500 group-hover:scale-110 transition" />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
 
+            {/* Step 2: Semester */}
+            {selectedYear && !selectedSemester && (
+              <div>
+                <h2 className="text-lg font-black text-blue-950 mb-4">
+                  اختر الفصل الدراسي لجيل {selectedYear}:
+                </h2>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {SEMESTERS.map((sem) => (
+                    <button
+                      key={sem.value}
+                      onClick={() => setSelectedSemester(sem.value)}
+                      className="p-6 bg-white border border-blue-100 hover:border-blue-500 rounded-2xl shadow-sm hover:shadow-md transition text-right flex items-center justify-between group"
+                    >
+                      <div>
+                        <h3 className="text-xl font-black text-blue-950 group-hover:text-blue-600 transition">
+                          {sem.label}
+                        </h3>
+                        <p className="text-xs text-slate-400 mt-1">
+                          دوسيات هذا الفصل الدراسي
+                        </p>
+                      </div>
+                      <Calendar className="w-7 h-7 text-blue-500 group-hover:scale-110 transition" />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Step 3: Subject */}
+            {selectedYear && selectedSemester && !selectedSubject && (
+              <div>
+                <h2 className="text-lg font-black text-blue-950 mb-4">
+                  اختر المادة الدراسية:
+                </h2>
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                  {currentSubjects.map((sub) => (
+                    <button
+                      key={sub}
+                      onClick={() => setSelectedSubject(sub)}
+                      className="p-5 bg-white border border-blue-100 hover:border-blue-500 rounded-2xl shadow-sm hover:shadow-md transition text-right flex items-center justify-between group"
+                    >
+                      <span className="font-black text-base text-blue-950 group-hover:text-blue-600 transition">
+                        {sub}
+                      </span>
+                      <ChevronLeft className="w-5 h-5 text-blue-400 group-hover:-translate-x-1 transition" />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Step 3.5: Sub-Track */}
+            {selectedYear &&
+              selectedSemester &&
+              selectedSubject &&
+              needsTrackSelection &&
+              !selectedSubTrack && (
                 <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1">صورة المنتج</label>
-                  <label className="flex items-center justify-center gap-2 p-3 bg-slate-50 border border-dashed border-slate-300 rounded-xl cursor-pointer hover:bg-slate-100 transition text-xs font-bold text-slate-600">
-                    <Upload className="w-4 h-4 text-slate-500" />
-                    <span>{imagePreview ? "تغيير الصورة" : "رفع صورة"}</span>
-                    <input type="file" accept="image/*" onChange={handleImageChange} className="hidden" />
-                  </label>
-                  {imagePreview && (
-                    <div className="mt-2 relative w-full h-32 rounded-xl overflow-hidden border border-slate-200">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={imagePreview} alt="معاينة" className="w-full h-full object-cover" />
+                  <h2 className="text-lg font-black text-blue-950 mb-4">
+                    اختر مسار مادة ({selectedSubject}):
+                  </h2>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {["متقدم", "أعمال"].map((track) => (
+                      <button
+                        key={track}
+                        onClick={() => setSelectedSubTrack(track)}
+                        className="p-6 bg-white border border-blue-100 hover:border-blue-500 rounded-2xl shadow-sm hover:shadow-md transition text-right flex items-center justify-between group"
+                      >
+                        <div>
+                          <h3 className="text-xl font-black text-blue-950 group-hover:text-blue-600 transition">
+                            {selectedSubject} ({track})
+                          </h3>
+                          <p className="text-xs text-slate-400 mt-1">
+                            عرض دوسيات مسار الـ {track}
+                          </p>
+                        </div>
+                        <ChevronLeft className="w-6 h-6 text-blue-500 group-hover:-translate-x-1 transition" />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+            {/* Step 4: Dossier Type */}
+            {selectedYear &&
+              selectedSemester &&
+              selectedSubject &&
+              (!needsTrackSelection || selectedSubTrack) &&
+              !selectedDossierType && (
+                <div>
+                  <h2 className="text-lg font-black text-blue-950 mb-4">
+                    اختر نوع الدوسية:
+                  </h2>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    {DOSSIER_TYPES.map((type) => (
+                      <button
+                        key={type}
+                        onClick={() => setSelectedDossierType(type)}
+                        className="p-6 bg-white border border-blue-100 hover:border-blue-500 rounded-2xl shadow-sm hover:shadow-md transition text-center group"
+                      >
+                        <BookOpen className="w-8 h-8 mx-auto mb-3 text-blue-500 group-hover:scale-110 transition" />
+                        <h3 className="text-xl font-black text-blue-950 group-hover:text-blue-600 transition">
+                          {type}
+                        </h3>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+            {/* Step 5: Cards List */}
+            {selectedYear &&
+              selectedSemester &&
+              selectedSubject &&
+              (!needsTrackSelection || selectedSubTrack) &&
+              selectedDossierType && (
+                <div>
+                  <div className="flex items-center justify-between mb-5">
+                    <div>
+                      <h2 className="text-lg font-black text-blue-950">
+                        {selectedSubject} {selectedSubTrack ? `(${selectedSubTrack})` : ""}
+                      </h2>
+                      <p className="text-sm text-slate-500 font-bold mt-1">
+                        {selectedDossierType} — الفصل {selectedSemester} — جيل {selectedYear}
+                      </p>
+                    </div>
+                  </div>
+
+                  {filteredItems.length === 0 ? (
+                    <div className="bg-white border border-blue-100 rounded-2xl p-8 text-center text-slate-500 shadow-sm">
+                      <BookOpen className="w-10 h-10 mx-auto mb-3 text-slate-300" />
+                      <p className="font-bold">
+                        لا توجد دوسيات مضافة لهذه الخيارات حالياً.
+                      </p>
+                      <p className="text-xs mt-2 text-slate-400">
+                        يمكنك البحث مباشرة عن اسم الدوسية في شريط البحث بالأعلى.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                      {filteredItems.map((item) => (
+                        <DossierCard key={item.id} item={item} addToCart={addToCart} />
+                      ))}
                     </div>
                   )}
                 </div>
-
-                <button
-                  type="submit"
-                  disabled={loadingProducts}
-                  className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition shadow-sm disabled:opacity-50"
-                >
-                  {loadingProducts ? "جاري الحفظ..." : "إضافة وحفظ"}
-                </button>
-              </form>
-            </div>
-
-            {/* قائمة المنتجات المعروضة */}
-            <div className="lg:col-span-2 space-y-4">
-              <h3 className="text-lg font-black text-blue-950">
-                {activeTab === "dossiers"
-                  ? `قائمة الدوسيات (${filteredDossiers.length})`
-                  : `قائمة المنتجات (${filteredStationery.length})`}
-              </h3>
-
-              {(activeTab === "dossiers" ? filteredDossiers : filteredStationery).length === 0 ? (
-                <div className="bg-white border border-blue-100 rounded-3xl p-12 text-center shadow-sm">
-                  <ShoppingBag className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-                  <h3 className="text-lg font-bold text-slate-600">
-                    {searchQuery ? "لا توجد نتائج مطابقة" : "لا توجد منتجات مضافة حالياً"}
-                  </h3>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {(activeTab === "dossiers" ? filteredDossiers : filteredStationery).map((item) => (
-                    <div
-                      key={item.id}
-                      className="bg-white border border-slate-100 rounded-2xl p-4 shadow-sm flex gap-4 items-center justify-between"
-                    >
-                      <div className="flex items-center gap-3">
-                        {item.image ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            src={item.image}
-                            alt={item.title}
-                            className="w-16 h-16 object-cover rounded-xl border border-slate-100 shrink-0"
-                          />
-                        ) : (
-                          <div className="w-16 h-16 rounded-xl bg-slate-100 flex items-center justify-center shrink-0">
-                            {activeTab === "dossiers" ? (
-                              <BookOpen className="w-6 h-6 text-slate-400" />
-                            ) : (
-                              <ShoppingBag className="w-6 h-6 text-slate-400" />
-                            )}
-                          </div>
-                        )}
-                        <div>
-                          <h4 className="font-bold text-sm text-blue-950 line-clamp-1">{item.title}</h4>
-                          <p className="text-xs font-black text-blue-600 mt-1">{item.price} د.أ</p>
-                          {activeTab === "dossiers" ? (
-                            <p className="text-[11px] text-slate-500 mt-0.5">
-                              جيل {item.year} - {item.subject} ({item.dossier_type})
-                            </p>
-                          ) : (
-                            <p className="text-[11px] text-slate-500 mt-0.5">{item.category}</p>
-                          )}
-                        </div>
-                      </div>
-
-                      <button
-                        onClick={() => handleDelete(item.id, activeTab as "dossiers" | "stationery")}
-                        className="p-2.5 text-rose-500 hover:bg-rose-50 rounded-xl border border-rose-100 transition shrink-0"
-                        title="حذف المنتج"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
               )}
-            </div>
-          </div>
+          </>
         )}
       </main>
+    </div>
+  );
+}
+
+function DossierCard({
+  item,
+  addToCart,
+}: {
+  item: DossierItem;
+  addToCart: (item: { id: string | number; name: string; price: number; image?: string }, qty: number) => void;
+}) {
+  return (
+    <div className="bg-white border border-blue-100 rounded-2xl overflow-hidden hover:border-blue-400 shadow-sm hover:shadow-md transition flex flex-col">
+      <div className="relative h-48 bg-slate-100">
+        {item.image ? (
+          <Image
+            src={item.image}
+            alt={item.title}
+            fill
+            sizes="(max-width: 640px) 100vw, 50vw"
+            className="object-cover"
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center">
+            <BookOpen className="w-12 h-12 text-slate-300" />
+          </div>
+        )}
+      </div>
+
+      <div className="p-5 flex-1 flex flex-col">
+        <div className="flex flex-wrap gap-2 mb-3">
+          {item.year && (
+            <span className="px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700 text-xs font-bold">
+              جيل {item.year}
+            </span>
+          )}
+          {item.semester && (
+            <span className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600 text-xs font-bold">
+              {item.semester.includes("الفصل") ? item.semester : `الفصل ${item.semester}`}
+            </span>
+          )}
+          {item.dossier_type && (
+            <span className="px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-700 text-xs font-bold">
+              {item.dossier_type}
+            </span>
+          )}
+        </div>
+
+        <h3 className="text-base font-black text-blue-950 mb-3">{item.title}</h3>
+
+        <span className="text-lg font-black text-blue-800 mt-auto">
+          {Number(item.price || 0).toFixed(2)} دينار
+        </span>
+      </div>
+
+      <div className="p-4 bg-slate-50 border-t border-slate-100">
+        <button
+          onClick={() => {
+            addToCart(
+              {
+                id: item.id,
+                name: item.title,
+                price: Number(item.price),
+                image: item.image,
+              },
+              1
+            );
+            alert("تمت الإضافة إلى السلة بنجاح!");
+          }}
+          className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition flex items-center justify-center gap-2 shadow-sm text-sm"
+        >
+          <ShoppingCart className="w-4 h-4" />
+          إضافة إلى السلة
+        </button>
+      </div>
     </div>
   );
 }
