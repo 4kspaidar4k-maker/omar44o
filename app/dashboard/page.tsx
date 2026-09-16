@@ -853,8 +853,14 @@ export default function DashboardPage() {
                       </div>
 
                       <div className="flex items-center justify-between pt-3 border-t border-slate-100 text-xs font-bold text-slate-600">
-                        <span>المجموع الفرعي: {order.subtotal} د.أ | التوصيل: {order.delivery_fee} د.أ</span>
-                        <span className="text-base font-black text-blue-950">الإجمالي: {order.total} د.أ</span>
+                        <div>
+                          <span>المجموع: {order.subtotal} د.أ</span>
+                          <span className="mx-2">|</span>
+                          <span>التوصيل: {order.delivery_fee} د.أ</span>
+                        </div>
+                        <div className="text-sm font-black text-blue-950">
+                          الإجمالي: {order.total} د.أ
+                        </div>
                       </div>
                     </div>
                   );
@@ -864,35 +870,41 @@ export default function DashboardPage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* نموذج الإضافة */}
-            <div className="lg:col-span-1 bg-white border border-blue-100 p-6 rounded-3xl shadow-sm h-fit space-y-4">
+            {/* نموذج إضافة عنصر جديد */}
+            <div className="lg:col-span-1 bg-white border border-blue-100 rounded-3xl p-6 shadow-sm h-fit space-y-6">
               <h3 className="text-lg font-black text-blue-950 flex items-center gap-2">
                 <PlusCircle className="w-5 h-5 text-blue-600" />
                 <span>
-                  {activeTab === "dossiers" ? "إضافة دوسية جديدة" : "إضافة قرطاسية / أداة / لعبة"}
+                  {activeTab === "dossiers" ? "إضافة دوسية جديدة" : "إضافة قرطاسية أو ألعاب"}
                 </span>
               </h3>
 
               <form onSubmit={handleAddItem} className="space-y-4">
                 <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1">اسم المنتج</label>
+                  <label className="block text-xs font-bold text-slate-600 mb-1">
+                    اسم المنتج / العنصر
+                  </label>
                   <input
                     type="text"
+                    required
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
-                    placeholder="مثال: دوسية التأسيس الشامل"
+                    placeholder="مثال: دوسية الرياضيات الفصل الأول"
                     className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-900 outline-none focus:border-blue-500"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1">السعر (د.أ)</label>
+                  <label className="block text-xs font-bold text-slate-600 mb-1">
+                    السعر (بالدينار الأردني)
+                  </label>
                   <input
                     type="number"
                     step="0.01"
+                    required
                     value={price}
                     onChange={(e) => setPrice(e.target.value)}
-                    placeholder="0.00"
+                    placeholder="مثال: 3.50"
                     className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-900 outline-none focus:border-blue-500"
                   />
                 </div>
@@ -949,7 +961,7 @@ export default function DashboardPage() {
                           className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-900 outline-none focus:border-blue-500"
                         >
                           <option value="متقدم">متقدم</option>
-                          <option value="أعمال">أعمال</option>
+                          <option value="عادي">عادي</option>
                         </select>
                       </div>
                     )}
@@ -985,46 +997,49 @@ export default function DashboardPage() {
                 <div>
                   <label className="block text-xs font-bold text-slate-600 mb-1">صورة المنتج</label>
                   <label className="flex items-center justify-center gap-2 p-3 bg-slate-50 border border-dashed border-slate-300 rounded-xl cursor-pointer hover:bg-slate-100 transition text-xs font-bold text-slate-600">
-                    <Upload className="w-4 h-4 text-blue-600" />
-                    <span>رفع صورة</span>
+                    <Upload className="w-4 h-4 text-slate-500" />
+                    <span>{imagePreview ? "تغيير الصورة" : "رفع صورة"}</span>
                     <input type="file" accept="image/*" onChange={handleImageChange} className="hidden" />
                   </label>
                   {imagePreview && (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={imagePreview}
-                      alt="معاينة"
-                      className="mt-2 w-full h-32 object-cover rounded-xl border border-slate-200"
-                    />
+                    <div className="mt-2 relative w-full h-32 rounded-xl overflow-hidden border border-slate-200">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={imagePreview} alt="معاينة" className="w-full h-full object-cover" />
+                    </div>
                   )}
                 </div>
 
                 <button
                   type="submit"
                   disabled={loadingProducts}
-                  className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition disabled:opacity-50"
+                  className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition shadow-sm disabled:opacity-50"
                 >
-                  {loadingProducts ? "جاري الحفظ..." : "حفظ المنتج"}
+                  {loadingProducts ? "جاري الحفظ..." : "إضافة وحفظ"}
                 </button>
               </form>
             </div>
 
-            {/* قائمة المنتجات */}
+            {/* قائمة المنتجات المعروضة */}
             <div className="lg:col-span-2 space-y-4">
               <h3 className="text-lg font-black text-blue-950">
-                {activeTab === "dossiers" ? "الدوسيات المضافة" : "القرطاسية والأدوات المضافة"}
+                {activeTab === "dossiers"
+                  ? `قائمة الدوسيات (${filteredDossiers.length})`
+                  : `قائمة المنتجات (${filteredStationery.length})`}
               </h3>
 
-              {((activeTab === "dossiers" ? filteredDossiers : filteredStationery).length === 0) ? (
+              {(activeTab === "dossiers" ? filteredDossiers : filteredStationery).length === 0 ? (
                 <div className="bg-white border border-blue-100 rounded-3xl p-12 text-center shadow-sm">
-                  <p className="text-slate-500 font-bold">لا توجد عناصر لعرضها.</p>
+                  <ShoppingBag className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+                  <h3 className="text-lg font-bold text-slate-600">
+                    {searchQuery ? "لا توجد نتائج مطابقة" : "لا توجد منتجات مضافة حالياً"}
+                  </h3>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {(activeTab === "dossiers" ? filteredDossiers : filteredStationery).map((item: any) => (
+                  {(activeTab === "dossiers" ? filteredDossiers : filteredStationery).map((item) => (
                     <div
                       key={item.id}
-                      className="bg-white border border-blue-100 rounded-2xl p-4 shadow-sm flex gap-4 items-center justify-between"
+                      className="bg-white border border-slate-100 rounded-2xl p-4 shadow-sm flex gap-4 items-center justify-between"
                     >
                       <div className="flex items-center gap-3">
                         {item.image ? (
@@ -1032,7 +1047,7 @@ export default function DashboardPage() {
                           <img
                             src={item.image}
                             alt={item.title}
-                            className="w-16 h-16 object-cover rounded-xl border border-slate-200 shrink-0"
+                            className="w-16 h-16 object-cover rounded-xl border border-slate-100 shrink-0"
                           />
                         ) : (
                           <div className="w-16 h-16 rounded-xl bg-slate-100 flex items-center justify-center shrink-0">
@@ -1044,22 +1059,22 @@ export default function DashboardPage() {
                           </div>
                         )}
                         <div>
-                          <h4 className="font-black text-sm text-blue-950 line-clamp-1">{item.title}</h4>
-                          <p className="text-xs font-bold text-blue-600 mt-0.5">{item.price} د.أ</p>
+                          <h4 className="font-bold text-sm text-blue-950 line-clamp-1">{item.title}</h4>
+                          <p className="text-xs font-black text-blue-600 mt-1">{item.price} د.أ</p>
                           {activeTab === "dossiers" ? (
-                            <p className="text-[11px] text-slate-400 mt-0.5">
-                              {item.year} | {item.subject} | {item.semester}
+                            <p className="text-[11px] text-slate-500 mt-0.5">
+                              جيل {item.year} - {item.subject} ({item.dossier_type})
                             </p>
                           ) : (
-                            <p className="text-[11px] text-slate-400 mt-0.5">{item.category}</p>
+                            <p className="text-[11px] text-slate-500 mt-0.5">{item.category}</p>
                           )}
                         </div>
                       </div>
 
                       <button
                         onClick={() => handleDelete(item.id, activeTab as "dossiers" | "stationery")}
-                        className="p-2 text-rose-500 hover:bg-rose-50 rounded-xl border border-rose-100 transition shrink-0"
-                        title="حذف"
+                        className="p-2.5 text-rose-500 hover:bg-rose-50 rounded-xl border border-rose-100 transition shrink-0"
+                        title="حذف المنتج"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
