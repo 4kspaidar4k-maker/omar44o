@@ -51,17 +51,17 @@ type Order = {
   items: OrderItem[];
 };
 
-const SUBJECTS_2010 = ["رياضيات", "عربي", "تاريخ الأردن", "دين"];
+const SUBJECTS_2010 = ["الرياضيات", "اللغة العربية", "تاريخ الأردن", "التربية الإسلامية"];
 const SUBJECTS_2009 = [
-  "رياضيات",
-  "إنجليزي",
-  "عربي",
+  "الرياضيات",
+  "اللغة الإنجليزية",
+  "اللغة العربية",
   "تاريخ الأردن",
-  "تربية إسلامية",
-  "فيزياء",
-  "كيمياء",
-  "أحياء",
-  "علوم أرض",
+  "التربية الإسلامية",
+  "الفيزياء",
+  "الكيمياء",
+  "الأحياء",
+  "علوم الأرض",
 ];
 
 export default function DashboardPage() {
@@ -85,7 +85,7 @@ export default function DashboardPage() {
 
   const [year, setYear] = useState("2009");
   const [semester, setSemester] = useState("الأول");
-  const [subject, setSubject] = useState("رياضيات");
+  const [subject, setSubject] = useState("الرياضيات");
   const [track, setTrack] = useState("متقدم");
   const [dossierType, setDossierType] = useState<DossierType>("مادة");
 
@@ -102,11 +102,11 @@ export default function DashboardPage() {
   useEffect(() => {
     if (year === "2010") {
       if (!SUBJECTS_2010.includes(subject)) {
-        setSubject("رياضيات");
+        setSubject("الرياضيات");
       }
     } else if (year === "2009") {
       if (!SUBJECTS_2009.includes(subject)) {
-        setSubject("رياضيات");
+        setSubject("الرياضيات");
       }
     }
   }, [year, subject]);
@@ -230,7 +230,11 @@ export default function DashboardPage() {
         alert("تعذر تحميل المنتجات: " + error.message);
       } else {
         const allProducts = data || [];
-        setDossiers(allProducts.filter((item: any) => item.category === "دوسيات"));
+        setDossiers(
+          allProducts.filter(
+            (item: any) => item.category === "دوسيات" || item.year || item.dossier_type
+          )
+        );
         setStationery(
           allProducts.filter(
             (item: any) =>
@@ -361,19 +365,30 @@ export default function DashboardPage() {
     }
 
     const isDossier = activeTab === "dossiers";
+
     const needsTrack =
       isDossier &&
       year === "2009" &&
-      (subject === "رياضيات" || subject === "إنجليزي");
+      (subject === "الرياضيات" ||
+        subject === "اللغة الإنجليزية" ||
+        subject === "رياضيات" ||
+        subject === "إنجليزي");
 
-    const finalSubject = needsTrack ? `${subject} (${track})` : subject;
+    let finalSubject = subject;
+    if (subject === "رياضيات") finalSubject = "الرياضيات";
+    if (subject === "إنجليزي") finalSubject = "اللغة الإنجليزية";
+
+    if (needsTrack) {
+      finalSubject = `${finalSubject} (${track})`;
+    }
 
     const newItem = {
       title: title.trim(),
       price: numericPrice,
-      year: isDossier ? year : null,
+      year: isDossier ? String(year) : null,
       semester: isDossier ? semester : null,
       subject: isDossier ? finalSubject : null,
+      track: isDossier && needsTrack ? track : null,
       dossier_type: isDossier ? dossierType : null,
       category: isDossier ? "دوسيات" : categoryType,
       image: imagePreview || null,
@@ -952,7 +967,7 @@ export default function DashboardPage() {
                       </select>
                     </div>
 
-                    {year === "2009" && (subject === "رياضيات" || subject === "إنجليزي") && (
+                    {year === "2009" && (subject.includes("الرياضيات") || subject.includes("اللغة الإنجليزية") || subject.includes("رياضيات") || subject.includes("إنجليزي")) && (
                       <div>
                         <label className="block text-xs font-bold text-slate-600 mb-1">المسار</label>
                         <select
@@ -961,7 +976,7 @@ export default function DashboardPage() {
                           className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-900 outline-none focus:border-blue-500"
                         >
                           <option value="متقدم">متقدم</option>
-                          <option value="عادي">عادي</option>
+                          <option value="أعمال">أعمال</option>
                         </select>
                       </div>
                     )}
