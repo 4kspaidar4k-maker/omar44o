@@ -43,12 +43,12 @@ const SUBJECTS_2010 = [
 
 const SUBJECTS_2009 = [
   "الرياضيات",
-  "اللغة العربية",
   "اللغة الإنجليزية",
-  "التربية الإسلامية",
+  "اللغة العربية",
   "تاريخ الأردن",
-  "الكيمياء",
+  "التربية الإسلامية",
   "الفيزياء",
+  "الكيمياء",
   "الأحياء",
   "علوم الأرض",
   "علم النفس",
@@ -67,7 +67,7 @@ const cleanStr = (str?: string | number | null): string => {
 };
 
 export default function DossiersPage() {
-  const { addToCart, totalItems } = useCart();
+  const { addToCart, totalItems } = useCart() as any;
 
   const [dossiersList, setDossiersList] = useState<DossierItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -548,7 +548,10 @@ function DossierCard({
   addToCart,
 }: {
   item: DossierItem;
-  addToCart: (item: { id: string | number; name: string; price: number; image?: string }, qty: number) => void;
+  addToCart: (
+    item: { id: string; name: string; price: number; image?: string },
+    qty?: number
+  ) => void;
 }) {
   return (
     <div className="bg-white border border-blue-100 rounded-2xl overflow-hidden hover:border-blue-400 shadow-sm hover:shadow-md transition flex flex-col">
@@ -599,7 +602,7 @@ function DossierCard({
           onClick={() => {
             addToCart(
               {
-                id: item.id,
+                id: String(item.id),
                 name: item.title,
                 price: Number(item.price),
                 image: item.image,
