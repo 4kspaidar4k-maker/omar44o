@@ -1,12 +1,11 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
-// مفتاح الذكاء الاصطناعي
+// استخدام المتغيرات البيئية بشكل آمن
 const GEMINI_API_KEY =
   process.env.GEMINI_API_KEY ||
   "AQ.Ab8RN6JZ58KXa5jNzL6q2SS7LuQ9Jrm6955zIeDV8W9P63YSDA";
 
-// بيانات قاعدة بيانات Supabase الخاصة بك
 const SUPABASE_URL =
   process.env.NEXT_PUBLIC_SUPABASE_URL ||
   "https://bkfcqlnyzpehhrwsnanm.supabase.co";
@@ -38,7 +37,7 @@ export async function POST(req: Request) {
       });
     }
 
-    // 2. الاتصال بقاعدة البيانات وجلب المنتجات المتوفرة حالياً
+    // 2. الاتصال بقاعدة البيانات وجلب المنتجات
     const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
     const { data: productsData, error: dbError } = await supabase
       .from("products")
@@ -53,7 +52,7 @@ export async function POST(req: Request) {
       );
     }
 
-    // 3. تجهيز وتنسيق قائمة المنتجات
+    // 3. تجهيز قائمة المنتجات
     const products = productsData || [];
     let storeProductsText = "";
 
@@ -82,7 +81,7 @@ export async function POST(req: Request) {
         .join("\n");
     }
 
-    // 4. تجهيز سجل الرسائل
+    // 4. تجهيز المحادثات
     const formattedMessages = messages.map(
       (m: { role: string; content: string }) => ({
         role: m.role === "assistant" ? "model" : "user",
@@ -90,9 +89,9 @@ export async function POST(req: Request) {
       })
     );
 
-    // 5. إرسال الطلب للذكاء الاصطناعي مع تعليمات الأجيال والردود
+    // 5. تعديل اسم النموذج إلى gemini-2.0-flash أو gemini-1.5-flash
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
       {
         method: "POST",
         headers: {
@@ -136,7 +135,7 @@ ${storeProductsText}`,
       data?.candidates?.[0]?.content?.parts?.[0]?.text ||
       "أهلاً بك، كيف بقدر أساعدك اليوم؟";
 
-    // 6. البحث عن منتج مطابق لإعادة كارت الشراء مع الرد
+    // 6. المطابقة وإعادة المنتج
     let matchedProduct = undefined;
     if (products.length > 0) {
       const found = products.find((p) => {
