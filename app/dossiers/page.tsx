@@ -57,6 +57,7 @@ const SUBJECTS_2009 = [
 
 const cleanStr = (str?: string | number | null): string => {
   if (!str) return "";
+
   return String(str)
     .trim()
     .toLowerCase()
@@ -73,10 +74,16 @@ export default function DossiersPage() {
   const [loading, setLoading] = useState(true);
 
   const [selectedYear, setSelectedYear] = useState<string | null>(null);
-  const [selectedSemester, setSelectedSemester] = useState<string | null>(null);
+  const [selectedSemester, setSelectedSemester] = useState<string | null>(
+    null
+  );
   const [selectedSubject, setSelectedSubject] = useState<string | null>(null);
-  const [selectedSubTrack, setSelectedSubTrack] = useState<string | null>(null);
-  const [selectedDossierType, setSelectedDossierType] = useState<string | null>(null);
+  const [selectedSubTrack, setSelectedSubTrack] = useState<string | null>(
+    null
+  );
+  const [selectedDossierType, setSelectedDossierType] = useState<string | null>(
+    null
+  );
   const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
@@ -96,6 +103,7 @@ export default function DossiersPage() {
           (item: DossierItem) =>
             item.category === "دوسيات" || item.year || item.dossier_type
         );
+
         setDossiersList(dossiersOnly);
       }
 
@@ -122,11 +130,13 @@ export default function DossiersPage() {
     setSearchQuery("");
   };
 
-  const currentSubjects = selectedYear === "2010" ? SUBJECTS_2010 : SUBJECTS_2009;
+  const currentSubjects =
+    selectedYear === "2010" ? SUBJECTS_2010 : SUBJECTS_2009;
 
   const needsTrackSelection =
     selectedYear === "2009" &&
-    (selectedSubject === "الرياضيات" || selectedSubject === "اللغة الإنجليزية");
+    (selectedSubject === "الرياضيات" ||
+      selectedSubject === "اللغة الإنجليزية");
 
   const filteredItems = useMemo(() => {
     const normalizedSearch = cleanStr(searchQuery);
@@ -135,6 +145,7 @@ export default function DossiersPage() {
       if (normalizedSearch) {
         const titleClean = cleanStr(item.title);
         const subjectClean = cleanStr(item.subject);
+
         return (
           titleClean.includes(normalizedSearch) ||
           subjectClean.includes(normalizedSearch)
@@ -148,6 +159,7 @@ export default function DossiersPage() {
 
       const itemSem = cleanStr(item.semester);
       const targetSem = cleanStr(selectedSemester);
+
       const semesterMatch =
         !selectedSemester ||
         !item.semester ||
@@ -166,6 +178,7 @@ export default function DossiersPage() {
         titleClean.includes(targetSub);
 
       const targetTrack = cleanStr(selectedSubTrack);
+
       const trackMatch =
         !selectedSubTrack ||
         itemSub.includes(targetTrack) ||
@@ -173,6 +186,7 @@ export default function DossiersPage() {
 
       const itemType = cleanStr(item.dossier_type);
       const targetType = cleanStr(selectedDossierType);
+
       const typeMatch =
         !selectedDossierType ||
         !item.dossier_type ||
@@ -180,7 +194,13 @@ export default function DossiersPage() {
         targetType.includes(itemType) ||
         titleClean.includes(targetType);
 
-      return yearMatch && semesterMatch && subjectMatch && trackMatch && typeMatch;
+      return (
+        yearMatch &&
+        semesterMatch &&
+        subjectMatch &&
+        trackMatch &&
+        typeMatch
+      );
     });
   }, [
     dossiersList,
@@ -200,7 +220,9 @@ export default function DossiersPage() {
           <div className="flex items-center gap-4">
             {selectedYear || searchQuery ? (
               <button
-                onClick={() => (searchQuery ? setSearchQuery("") : handleBack())}
+                onClick={() =>
+                  searchQuery ? setSearchQuery("") : handleBack()
+                }
                 className="p-2 rounded-full hover:bg-slate-100 text-blue-900 transition flex items-center gap-1 font-bold text-sm"
               >
                 <ArrowRight className="w-5 h-5" />
@@ -225,6 +247,7 @@ export default function DossiersPage() {
             className="relative flex items-center justify-center p-3 rounded-full bg-blue-50 border border-blue-200 hover:bg-blue-100 transition shadow-sm"
           >
             <ShoppingCart className="w-5 h-5 text-blue-900" />
+
             {totalItems > 0 && (
               <span className="absolute -top-1.5 -right-1.5 bg-blue-600 text-white text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center shadow">
                 {totalItems}
@@ -238,13 +261,17 @@ export default function DossiersPage() {
       <div className="max-w-5xl mx-auto px-6 pt-6">
         {!searchQuery && (
           <div className="flex items-center gap-2 text-xs md:text-sm text-slate-500 font-bold overflow-x-auto pb-2">
-            <button onClick={resetAll} className="hover:text-blue-600 whitespace-nowrap">
+            <button
+              onClick={resetAll}
+              className="hover:text-blue-600 whitespace-nowrap"
+            >
               الأجيال
             </button>
 
             {selectedYear && (
               <>
                 <ChevronLeft className="w-4 h-4 text-slate-400" />
+
                 <button
                   onClick={() => {
                     setSelectedSemester(null);
@@ -262,6 +289,7 @@ export default function DossiersPage() {
             {selectedSemester && (
               <>
                 <ChevronLeft className="w-4 h-4 text-slate-400" />
+
                 <button
                   onClick={() => {
                     setSelectedSubject(null);
@@ -278,6 +306,7 @@ export default function DossiersPage() {
             {selectedSubject && (
               <>
                 <ChevronLeft className="w-4 h-4 text-slate-400" />
+
                 <button
                   onClick={() => {
                     setSelectedSubTrack(null);
@@ -293,6 +322,7 @@ export default function DossiersPage() {
             {selectedSubTrack && (
               <>
                 <ChevronLeft className="w-4 h-4 text-slate-400" />
+
                 <button
                   onClick={() => setSelectedDossierType(null)}
                   className="hover:text-blue-600 text-blue-900 whitespace-nowrap"
@@ -305,6 +335,7 @@ export default function DossiersPage() {
             {selectedDossierType && (
               <>
                 <ChevronLeft className="w-4 h-4 text-slate-400" />
+
                 <span className="text-blue-600 whitespace-nowrap">
                   {selectedDossierType}
                 </span>
@@ -321,6 +352,7 @@ export default function DossiersPage() {
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-12 pr-4 py-3.5 bg-white border border-blue-200 rounded-2xl outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition shadow-sm text-sm font-bold text-blue-950"
           />
+
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
         </div>
       </div>
@@ -330,15 +362,20 @@ export default function DossiersPage() {
           <div className="bg-white border border-blue-100 rounded-2xl p-10 text-center shadow-sm">
             <div className="animate-pulse">
               <BookOpen className="w-10 h-10 mx-auto text-blue-400 mb-3" />
-              <p className="font-bold text-slate-500">جاري تحميل الدوسيات...</p>
+
+              <p className="font-bold text-slate-500">
+                جاري تحميل الدوسيات...
+              </p>
             </div>
           </div>
         ) : searchQuery ? (
           <div>
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-black text-blue-950">
-                نتائج البحث عن: &quot;{searchQuery}&quot; ({filteredItems.length})
+                نتائج البحث عن: &quot;{searchQuery}&quot; (
+                {filteredItems.length})
               </h2>
+
               <button
                 onClick={() => setSearchQuery("")}
                 className="text-xs font-bold text-blue-600 hover:underline"
@@ -349,12 +386,18 @@ export default function DossiersPage() {
 
             {filteredItems.length === 0 ? (
               <div className="bg-white border border-blue-100 rounded-2xl p-8 text-center text-slate-500 shadow-sm">
-                <p className="font-bold">لا توجد دوسيات مطابقة لبحثك.</p>
+                <p className="font-bold">
+                  لا توجد دوسيات مطابقة لبحثك.
+                </p>
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                 {filteredItems.map((item) => (
-                  <DossierCard key={item.id} item={item} addToCart={addToCart} />
+                  <DossierCard
+                    key={item.id}
+                    item={item}
+                    addToCart={addToCart}
+                  />
                 ))}
               </div>
             )}
@@ -367,6 +410,7 @@ export default function DossiersPage() {
                 <h2 className="text-lg font-black text-blue-950 mb-4">
                   اختر الجيل الدراسي:
                 </h2>
+
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {["2010", "2009"].map((year) => (
                     <button
@@ -378,10 +422,12 @@ export default function DossiersPage() {
                         <h3 className="text-2xl font-black text-blue-950 group-hover:text-blue-600 transition">
                           دوسيات جيل {year}
                         </h3>
+
                         <p className="text-xs text-slate-400 mt-1">
                           تصفح مواد الدعم والمناهج الخاصة بهذا الجيل
                         </p>
                       </div>
+
                       <Layers className="w-8 h-8 text-blue-500 group-hover:scale-110 transition" />
                     </button>
                   ))}
@@ -395,6 +441,7 @@ export default function DossiersPage() {
                 <h2 className="text-lg font-black text-blue-950 mb-4">
                   اختر الفصل الدراسي لجيل {selectedYear}:
                 </h2>
+
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {SEMESTERS.map((sem) => (
                     <button
@@ -406,10 +453,12 @@ export default function DossiersPage() {
                         <h3 className="text-xl font-black text-blue-950 group-hover:text-blue-600 transition">
                           {sem.label}
                         </h3>
+
                         <p className="text-xs text-slate-400 mt-1">
                           دوسيات هذا الفصل الدراسي
                         </p>
                       </div>
+
                       <Calendar className="w-7 h-7 text-blue-500 group-hover:scale-110 transition" />
                     </button>
                   ))}
@@ -423,6 +472,7 @@ export default function DossiersPage() {
                 <h2 className="text-lg font-black text-blue-950 mb-4">
                   اختر المادة الدراسية:
                 </h2>
+
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                   {currentSubjects.map((sub) => (
                     <button
@@ -433,6 +483,7 @@ export default function DossiersPage() {
                       <span className="font-black text-base text-blue-950 group-hover:text-blue-600 transition">
                         {sub}
                       </span>
+
                       <ChevronLeft className="w-5 h-5 text-blue-400 group-hover:-translate-x-1 transition" />
                     </button>
                   ))}
@@ -450,6 +501,7 @@ export default function DossiersPage() {
                   <h2 className="text-lg font-black text-blue-950 mb-4">
                     اختر مسار مادة ({selectedSubject}):
                   </h2>
+
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     {["متقدم", "أعمال"].map((track) => (
                       <button
@@ -461,10 +513,12 @@ export default function DossiersPage() {
                           <h3 className="text-xl font-black text-blue-950 group-hover:text-blue-600 transition">
                             {selectedSubject} ({track})
                           </h3>
+
                           <p className="text-xs text-slate-400 mt-1">
                             عرض دوسيات مسار الـ {track}
                           </p>
                         </div>
+
                         <ChevronLeft className="w-6 h-6 text-blue-500 group-hover:-translate-x-1 transition" />
                       </button>
                     ))}
@@ -482,6 +536,7 @@ export default function DossiersPage() {
                   <h2 className="text-lg font-black text-blue-950 mb-4">
                     اختر نوع الدوسية:
                   </h2>
+
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     {DOSSIER_TYPES.map((type) => (
                       <button
@@ -490,6 +545,7 @@ export default function DossiersPage() {
                         className="p-6 bg-white border border-blue-100 hover:border-blue-500 rounded-2xl shadow-sm hover:shadow-md transition text-center group"
                       >
                         <BookOpen className="w-8 h-8 mx-auto mb-3 text-blue-500 group-hover:scale-110 transition" />
+
                         <h3 className="text-xl font-black text-blue-950 group-hover:text-blue-600 transition">
                           {type}
                         </h3>
@@ -509,10 +565,13 @@ export default function DossiersPage() {
                   <div className="flex items-center justify-between mb-5">
                     <div>
                       <h2 className="text-lg font-black text-blue-950">
-                        {selectedSubject} {selectedSubTrack ? `(${selectedSubTrack})` : ""}
+                        {selectedSubject}{" "}
+                        {selectedSubTrack ? `(${selectedSubTrack})` : ""}
                       </h2>
+
                       <p className="text-sm text-slate-500 font-bold mt-1">
-                        {selectedDossierType} — الفصل {selectedSemester} — جيل {selectedYear}
+                        {selectedDossierType} — الفصل {selectedSemester} — جيل{" "}
+                        {selectedYear}
                       </p>
                     </div>
                   </div>
@@ -520,9 +579,11 @@ export default function DossiersPage() {
                   {filteredItems.length === 0 ? (
                     <div className="bg-white border border-blue-100 rounded-2xl p-8 text-center text-slate-500 shadow-sm">
                       <BookOpen className="w-10 h-10 mx-auto mb-3 text-slate-300" />
+
                       <p className="font-bold">
                         لا توجد دوسيات مضافة لهذه الخيارات حالياً.
                       </p>
+
                       <p className="text-xs mt-2 text-slate-400">
                         يمكنك البحث مباشرة عن اسم الدوسية في شريط البحث بالأعلى.
                       </p>
@@ -530,7 +591,11 @@ export default function DossiersPage() {
                   ) : (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                       {filteredItems.map((item) => (
-                        <DossierCard key={item.id} item={item} addToCart={addToCart} />
+                        <DossierCard
+                          key={item.id}
+                          item={item}
+                          addToCart={addToCart}
+                        />
                       ))}
                     </div>
                   )}
@@ -549,13 +614,19 @@ function DossierCard({
 }: {
   item: DossierItem;
   addToCart: (
-    item: { id: string; name: string; price: number; image?: string },
+    item: {
+      id: string;
+      name: string;
+      price: number;
+      image?: string;
+    },
     qty?: number
   ) => void;
 }) {
   return (
     <div className="bg-white border border-blue-100 rounded-2xl overflow-hidden hover:border-blue-400 shadow-sm hover:shadow-md transition flex flex-col">
-      <div className="relative h-48 bg-slate-100">
+      {/* صورة الدوسية بشكل طولي */}
+      <div className="relative w-full aspect-[2/3] bg-slate-100">
         {item.image ? (
           <Image
             src={item.image}
@@ -578,11 +649,15 @@ function DossierCard({
               جيل {item.year}
             </span>
           )}
+
           {item.semester && (
             <span className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600 text-xs font-bold">
-              {item.semester.includes("الفصل") ? item.semester : `الفصل ${item.semester}`}
+              {item.semester.includes("الفصل")
+                ? item.semester
+                : `الفصل ${item.semester}`}
             </span>
           )}
+
           {item.dossier_type && (
             <span className="px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-700 text-xs font-bold">
               {item.dossier_type}
@@ -590,7 +665,9 @@ function DossierCard({
           )}
         </div>
 
-        <h3 className="text-base font-black text-blue-950 mb-3">{item.title}</h3>
+        <h3 className="text-base font-black text-blue-950 mb-3">
+          {item.title}
+        </h3>
 
         <span className="text-lg font-black text-blue-800 mt-auto">
           {Number(item.price || 0).toFixed(2)} دينار
@@ -609,6 +686,7 @@ function DossierCard({
               },
               1
             );
+
             alert("تمت الإضافة إلى السلة بنجاح!");
           }}
           className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition flex items-center justify-center gap-2 shadow-sm text-sm"
