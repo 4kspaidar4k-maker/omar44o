@@ -27,7 +27,18 @@ export async function POST(req: Request) {
       );
     }
 
-    // 1. الاتصال بقاعدة البيانات وجلب المنتجات المتوفرة حالياً
+    const lastUserMessage = messages[messages.length - 1]?.content || "";
+    const lowerText = lastUserMessage.toLowerCase();
+
+    // 1. التعامل الفوري مع استفسارات البطاقات
+    if (lowerText.includes("بطاقة") || lowerText.includes("بطاقات")) {
+      return NextResponse.json({
+        reply:
+          "لا والله حالياً غير متوفر بالموقع، إذا بدك موجود ممكن تتصل على إحدى الموظفين وممكن هم يساعدوك بالبطاقات.",
+      });
+    }
+
+    // 2. الاتصال بقاعدة البيانات وجلب المنتجات المتوفرة حالياً
     const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
     const { data: productsData, error: dbError } = await supabase
       .from("products")
@@ -42,7 +53,7 @@ export async function POST(req: Request) {
       );
     }
 
-    // 2. تجهيز وتنسيق قائمة المنتجات
+    // 3. تجهيز وتنسيق قائمة المنتجات
     const products = productsData || [];
     let storeProductsText = "";
 
@@ -52,13 +63,15 @@ export async function POST(req: Request) {
       storeProductsText = products
         .map((p, i) => {
           const details = [
-            `الاسم: ${p.title || "بدون اسم"}`,
+            `المعرف: ${p.id}`,
+            `الاسم: ${p.title || p.name || "بدون اسم"}`,
             `السعر: ${
               p.price !== null && p.price !== undefined
                 ? `${p.price} د.أ`
                 : "غير محدد"
             }`,
             `القسم: ${p.category || "عام"}`,
+            `الصورة: ${p.image || p.image_url || ""}`,
           ];
           if (p.subject) details.push(`المادة: ${p.subject}`);
           if (p.year) details.push(`الجيل: ${p.year}`);
@@ -69,7 +82,7 @@ export async function POST(req: Request) {
         .join("\n");
     }
 
-    // 3. تجهيز سجل الرسائل
+    // 4. تجهيز سجل الرسائل
     const formattedMessages = messages.map(
       (m: { role: string; content: string }) => ({
         role: m.role === "assistant" ? "model" : "user",
@@ -77,9 +90,9 @@ export async function POST(req: Request) {
       })
     );
 
-    // 4. إرسال الطلب للذكاء الاصطناعي مع المنتجات الفعلية
+    // 5. إرسال الطلب للذكاء الاصطناعي مع تعليمات الأجيال والردود
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${GEMINI_API_KEY}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
       {
         method: "POST",
         headers: {
@@ -92,9 +105,9 @@ export async function POST(req: Request) {
                 text: `أنت المساعد الذكي الرسمي لمكتبة أبو طوق.
 
 قواعد التعامل مع طلبات الزبائن:
-1. فهم العامية والبحث المرن: افهم الزبون كيفما كتب ("دوسيه"، "دوسية"، "ابحثلي عن"، "عندكو"، "بدي"). استخرج الكلمة المفتاحية (اسم المادة، اسم الأستاذ، أو اسم المنتج) وقارنها بالقائمة المرفقة.
-2. التطابق التقريبي والجزئي: إذا كتب الزبون اسماً مثل "عمر" وكان جزءاً من اسم منتج عندك أو قريباً منه جداً، اعتبره موجوداً فوراً.
-3. التوافر: إذا كان المنتج موجوداً، جاوبه بلهجة أردنية لطيفة ومختصرة واذكر اسم المنتج وسعره المكتوب (مثال: "أه والله موجودة [اسم الدوسية] وسعرها [السعر] د.أ، بتحب نجهزلك إياها؟").
+1. جيل 2010 وجيل 2009 متوفرين تماماً: جميع دوسيات جيل 2010 وجيل 2009 متوفرة في قاعدة البيانات بمختلف الأقسام والمواد. إذا سأل الزبون بشكل عام عن توفر دوسيات 2010 أو 2009 أكد له فوراً أنها متوفرة واسأله عن المادة أو الأستاذ ليجدها له.
+2. فهم العامية والبحث المرن: افهم الزبون كيفما كتب ("دوسيه"، "دوسية"، "ابحثلي عن"، "عندكو"، "بدي"). قارن البحث بالأسماء والأقسام والأجيال والمواد في القائمة المرفقة.
+3. التوافر: إذا وجد الزبون دوسية أو منتجاً معيناً، جاوبه بلهجة أردنية مهذبة واطلب منه تأكيد الإضافة بالسلة (مثال: "أه والله موجودة [اسم الدوسية] وسعرها [السعر] د.أ، بتحب أضيفلك إياها بالسلة؟").
 4. عدم التوافر: إذا لم تجد أي كلمة قريبة أو مطابقة في القائمة، احكيله بوضوح: "لا والله، مش موجودة حالياً بالمكتبة".
 5. ممنوع التخمين: لا تخترع أسماء أو أسعار من عندك، واعتمد حصراً على القائمة.
 6. لا تفصح عن أي تفاصيل برمجية (Supabase أو API أو قاعدة بيانات) للمستخدم.
@@ -123,7 +136,33 @@ ${storeProductsText}`,
       data?.candidates?.[0]?.content?.parts?.[0]?.text ||
       "أهلاً بك، كيف بقدر أساعدك اليوم؟";
 
-    return NextResponse.json({ reply });
+    // 6. البحث عن منتج مطابق لإعادة كارت الشراء مع الرد
+    let matchedProduct = undefined;
+    if (products.length > 0) {
+      const found = products.find((p) => {
+        const title = (p.title || p.name || "").toLowerCase();
+        const subject = (p.subject || "").toLowerCase();
+        return (
+          (title && lowerText.includes(title)) ||
+          (subject && lowerText.includes(subject)) ||
+          (p.year && lowerText.includes(String(p.year)))
+        );
+      });
+
+      if (found) {
+        matchedProduct = {
+          id: String(found.id),
+          title: found.title || found.name || "دوسية",
+          price: Number(found.price || 0),
+          image: found.image || found.image_url || undefined,
+        };
+      }
+    }
+
+    return NextResponse.json({
+      reply,
+      product: matchedProduct,
+    });
   } catch (error: any) {
     console.error("Server Error:", error);
     return NextResponse.json(
