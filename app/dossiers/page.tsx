@@ -216,8 +216,8 @@ export default function DossiersPage() {
     <div dir="rtl" className="min-h-screen bg-slate-50 text-slate-800">
       {/* HEADER */}
       <header className="sticky top-0 z-40 backdrop-blur-md bg-white/85 border-b border-blue-100 shadow-sm">
-        <div className="max-w-5xl mx-auto px-6 h-20 flex items-center justify-between">
-          <div className="flex items-center gap-4">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 h-20 flex items-center justify-between">
+          <div className="flex items-center gap-3 sm:gap-4">
             {selectedYear || searchQuery ? (
               <button
                 onClick={() =>
@@ -237,14 +237,14 @@ export default function DossiersPage() {
               </Link>
             )}
 
-            <h1 className="text-xl md:text-2xl font-black text-blue-950">
+            <h1 className="text-lg md:text-2xl font-black text-blue-950">
               قسم الدوسيات والبطاقات
             </h1>
           </div>
 
           <Link
             href="/cart"
-            className="relative flex items-center justify-center p-3 rounded-full bg-blue-50 border border-blue-200 hover:bg-blue-100 transition shadow-sm"
+            className="relative flex items-center justify-center p-2.5 rounded-full bg-blue-50 border border-blue-200 hover:bg-blue-100 transition shadow-sm"
           >
             <ShoppingCart className="w-5 h-5 text-blue-900" />
 
@@ -258,7 +258,7 @@ export default function DossiersPage() {
       </header>
 
       {/* BREADCRUMBS & SEARCH */}
-      <div className="max-w-5xl mx-auto px-6 pt-6">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 pt-5">
         {!searchQuery && (
           <div className="flex items-center gap-2 text-xs md:text-sm text-slate-500 font-bold overflow-x-auto pb-2">
             <button
@@ -344,20 +344,20 @@ export default function DossiersPage() {
           </div>
         )}
 
-        <div className="relative mt-4 mb-2">
+        <div className="relative mt-3 mb-2">
           <input
             type="text"
             placeholder="ابحث مباشرة عن اسم الدوسية أو المادة..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-12 pr-4 py-3.5 bg-white border border-blue-200 rounded-2xl outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition shadow-sm text-sm font-bold text-blue-950"
+            className="w-full pl-11 pr-4 py-3 bg-white border border-blue-200 rounded-2xl outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition shadow-sm text-sm font-bold text-blue-950"
           />
 
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
         </div>
       </div>
 
-      <main className="max-w-5xl mx-auto px-6 py-6">
+      <main className="max-w-5xl mx-auto px-4 sm:px-6 py-5">
         {loading ? (
           <div className="bg-white border border-blue-100 rounded-2xl p-10 text-center shadow-sm">
             <div className="animate-pulse">
@@ -371,7 +371,7 @@ export default function DossiersPage() {
         ) : searchQuery ? (
           <div>
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-black text-blue-950">
+              <h2 className="text-base md:text-lg font-black text-blue-950">
                 نتائج البحث عن: &quot;{searchQuery}&quot; (
                 {filteredItems.length})
               </h2>
@@ -391,7 +391,7 @@ export default function DossiersPage() {
                 </p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+              <div className="grid grid-cols-2 gap-3 sm:gap-4">
                 {filteredItems.map((item) => (
                   <DossierCard
                     key={item.id}
@@ -407,28 +407,28 @@ export default function DossiersPage() {
             {/* Step 1: Year */}
             {!selectedYear && (
               <div>
-                <h2 className="text-lg font-black text-blue-950 mb-4">
+                <h2 className="text-base md:text-lg font-black text-blue-950 mb-4">
                   اختر الجيل الدراسي:
                 </h2>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 gap-3 sm:gap-4">
                   {["2010", "2009"].map((year) => (
                     <button
                       key={year}
                       onClick={() => setSelectedYear(year)}
-                      className="p-6 bg-white border border-blue-100 hover:border-blue-500 rounded-2xl shadow-sm hover:shadow-md transition text-right flex items-center justify-between group"
+                      className="p-4 sm:p-6 bg-white border border-blue-100 hover:border-blue-500 rounded-2xl shadow-sm hover:shadow-md transition text-right flex items-center justify-between group"
                     >
                       <div>
-                        <h3 className="text-2xl font-black text-blue-950 group-hover:text-blue-600 transition">
+                        <h3 className="text-xl sm:text-2xl font-black text-blue-950 group-hover:text-blue-600 transition">
                           دوسيات جيل {year}
                         </h3>
 
-                        <p className="text-xs text-slate-400 mt-1">
+                        <p className="hidden sm:block text-xs text-slate-400 mt-1">
                           تصفح مواد الدعم والمناهج الخاصة بهذا الجيل
                         </p>
                       </div>
 
-                      <Layers className="w-8 h-8 text-blue-500 group-hover:scale-110 transition" />
+                      <Layers className="w-6 h-6 sm:w-8 sm:h-8 text-blue-500 group-hover:scale-110 transition" />
                     </button>
                   ))}
                 </div>
@@ -438,28 +438,28 @@ export default function DossiersPage() {
             {/* Step 2: Semester */}
             {selectedYear && !selectedSemester && (
               <div>
-                <h2 className="text-lg font-black text-blue-950 mb-4">
+                <h2 className="text-base md:text-lg font-black text-blue-950 mb-4">
                   اختر الفصل الدراسي لجيل {selectedYear}:
                 </h2>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 gap-3 sm:gap-4">
                   {SEMESTERS.map((sem) => (
                     <button
                       key={sem.value}
                       onClick={() => setSelectedSemester(sem.value)}
-                      className="p-6 bg-white border border-blue-100 hover:border-blue-500 rounded-2xl shadow-sm hover:shadow-md transition text-right flex items-center justify-between group"
+                      className="p-4 sm:p-6 bg-white border border-blue-100 hover:border-blue-500 rounded-2xl shadow-sm hover:shadow-md transition text-right flex items-center justify-between group"
                     >
                       <div>
-                        <h3 className="text-xl font-black text-blue-950 group-hover:text-blue-600 transition">
+                        <h3 className="text-lg sm:text-xl font-black text-blue-950 group-hover:text-blue-600 transition">
                           {sem.label}
                         </h3>
 
-                        <p className="text-xs text-slate-400 mt-1">
+                        <p className="hidden sm:block text-xs text-slate-400 mt-1">
                           دوسيات هذا الفصل الدراسي
                         </p>
                       </div>
 
-                      <Calendar className="w-7 h-7 text-blue-500 group-hover:scale-110 transition" />
+                      <Calendar className="w-6 h-6 sm:w-7 sm:h-7 text-blue-500 group-hover:scale-110 transition" />
                     </button>
                   ))}
                 </div>
@@ -469,22 +469,22 @@ export default function DossiersPage() {
             {/* Step 3: Subject */}
             {selectedYear && selectedSemester && !selectedSubject && (
               <div>
-                <h2 className="text-lg font-black text-blue-950 mb-4">
+                <h2 className="text-base md:text-lg font-black text-blue-950 mb-4">
                   اختر المادة الدراسية:
                 </h2>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
                   {currentSubjects.map((sub) => (
                     <button
                       key={sub}
                       onClick={() => setSelectedSubject(sub)}
-                      className="p-5 bg-white border border-blue-100 hover:border-blue-500 rounded-2xl shadow-sm hover:shadow-md transition text-right flex items-center justify-between group"
+                      className="p-4 sm:p-5 bg-white border border-blue-100 hover:border-blue-500 rounded-2xl shadow-sm hover:shadow-md transition text-right flex items-center justify-between group"
                     >
-                      <span className="font-black text-base text-blue-950 group-hover:text-blue-600 transition">
+                      <span className="font-black text-sm sm:text-base text-blue-950 group-hover:text-blue-600 transition">
                         {sub}
                       </span>
 
-                      <ChevronLeft className="w-5 h-5 text-blue-400 group-hover:-translate-x-1 transition" />
+                      <ChevronLeft className="w-4 h-4 sm:w-5 sm:h-5 text-blue-400 group-hover:-translate-x-1 transition" />
                     </button>
                   ))}
                 </div>
@@ -498,28 +498,28 @@ export default function DossiersPage() {
               needsTrackSelection &&
               !selectedSubTrack && (
                 <div>
-                  <h2 className="text-lg font-black text-blue-950 mb-4">
+                  <h2 className="text-base md:text-lg font-black text-blue-950 mb-4">
                     اختر مسار مادة ({selectedSubject}):
                   </h2>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-2 gap-3 sm:gap-4">
                     {["متقدم", "أعمال"].map((track) => (
                       <button
                         key={track}
                         onClick={() => setSelectedSubTrack(track)}
-                        className="p-6 bg-white border border-blue-100 hover:border-blue-500 rounded-2xl shadow-sm hover:shadow-md transition text-right flex items-center justify-between group"
+                        className="p-4 sm:p-6 bg-white border border-blue-100 hover:border-blue-500 rounded-2xl shadow-sm hover:shadow-md transition text-right flex items-center justify-between group"
                       >
                         <div>
-                          <h3 className="text-xl font-black text-blue-950 group-hover:text-blue-600 transition">
+                          <h3 className="text-lg sm:text-xl font-black text-blue-950 group-hover:text-blue-600 transition">
                             {selectedSubject} ({track})
                           </h3>
 
-                          <p className="text-xs text-slate-400 mt-1">
+                          <p className="hidden sm:block text-xs text-slate-400 mt-1">
                             عرض دوسيات مسار الـ {track}
                           </p>
                         </div>
 
-                        <ChevronLeft className="w-6 h-6 text-blue-500 group-hover:-translate-x-1 transition" />
+                        <ChevronLeft className="w-5 h-5 sm:w-6 sm:h-6 text-blue-500 group-hover:-translate-x-1 transition" />
                       </button>
                     ))}
                   </div>
@@ -533,20 +533,20 @@ export default function DossiersPage() {
               (!needsTrackSelection || selectedSubTrack) &&
               !selectedDossierType && (
                 <div>
-                  <h2 className="text-lg font-black text-blue-950 mb-4">
+                  <h2 className="text-base md:text-lg font-black text-blue-950 mb-4">
                     اختر نوع الدوسية:
                   </h2>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
                     {DOSSIER_TYPES.map((type) => (
                       <button
                         key={type}
                         onClick={() => setSelectedDossierType(type)}
-                        className="p-6 bg-white border border-blue-100 hover:border-blue-500 rounded-2xl shadow-sm hover:shadow-md transition text-center group"
+                        className="p-4 sm:p-6 bg-white border border-blue-100 hover:border-blue-500 rounded-2xl shadow-sm hover:shadow-md transition text-center group"
                       >
-                        <BookOpen className="w-8 h-8 mx-auto mb-3 text-blue-500 group-hover:scale-110 transition" />
+                        <BookOpen className="w-7 h-7 sm:w-8 sm:h-8 mx-auto mb-2 sm:mb-3 text-blue-500 group-hover:scale-110 transition" />
 
-                        <h3 className="text-xl font-black text-blue-950 group-hover:text-blue-600 transition">
+                        <h3 className="text-base sm:text-xl font-black text-blue-950 group-hover:text-blue-600 transition">
                           {type}
                         </h3>
                       </button>
@@ -562,14 +562,14 @@ export default function DossiersPage() {
               (!needsTrackSelection || selectedSubTrack) &&
               selectedDossierType && (
                 <div>
-                  <div className="flex items-center justify-between mb-5">
+                  <div className="flex items-center justify-between mb-4">
                     <div>
-                      <h2 className="text-lg font-black text-blue-950">
+                      <h2 className="text-base md:text-lg font-black text-blue-950">
                         {selectedSubject}{" "}
                         {selectedSubTrack ? `(${selectedSubTrack})` : ""}
                       </h2>
 
-                      <p className="text-sm text-slate-500 font-bold mt-1">
+                      <p className="text-xs sm:text-sm text-slate-500 font-bold mt-1">
                         {selectedDossierType} — الفصل {selectedSemester} — جيل{" "}
                         {selectedYear}
                       </p>
@@ -589,7 +589,7 @@ export default function DossiersPage() {
                       </p>
                     </div>
                   ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                    <div className="grid grid-cols-2 gap-3 sm:gap-4">
                       {filteredItems.map((item) => (
                         <DossierCard
                           key={item.id}
@@ -624,34 +624,35 @@ function DossierCard({
   ) => void;
 }) {
   return (
-    <div className="bg-white border border-blue-100 rounded-2xl overflow-hidden hover:border-blue-400 shadow-sm hover:shadow-md transition flex flex-col">
-      {/* صورة الدوسية بشكل طولي */}
+    <div className="bg-white border border-blue-100 rounded-xl sm:rounded-2xl overflow-hidden hover:border-blue-400 shadow-sm hover:shadow-md transition flex flex-col">
+      {/* الصورة — بقيت طولية بدون تغيير */}
       <div className="relative w-full aspect-[2/3] bg-slate-100">
         {item.image ? (
           <Image
             src={item.image}
             alt={item.title}
             fill
-            sizes="(max-width: 640px) 100vw, 50vw"
+            sizes="(max-width: 640px) 50vw, 33vw"
             className="object-cover"
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center">
-            <BookOpen className="w-12 h-12 text-slate-300" />
+            <BookOpen className="w-8 h-8 sm:w-12 sm:h-12 text-slate-300" />
           </div>
         )}
       </div>
 
-      <div className="p-5 flex-1 flex flex-col">
-        <div className="flex flex-wrap gap-2 mb-3">
+      {/* التفاصيل — أصغر */}
+      <div className="p-2.5 sm:p-3 flex-1 flex flex-col">
+        <div className="flex flex-wrap gap-1.5 mb-2">
           {item.year && (
-            <span className="px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700 text-xs font-bold">
+            <span className="px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 text-[10px] sm:text-xs font-bold">
               جيل {item.year}
             </span>
           )}
 
           {item.semester && (
-            <span className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600 text-xs font-bold">
+            <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 text-[10px] sm:text-xs font-bold">
               {item.semester.includes("الفصل")
                 ? item.semester
                 : `الفصل ${item.semester}`}
@@ -659,22 +660,23 @@ function DossierCard({
           )}
 
           {item.dossier_type && (
-            <span className="px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-700 text-xs font-bold">
+            <span className="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 text-[10px] sm:text-xs font-bold">
               {item.dossier_type}
             </span>
           )}
         </div>
 
-        <h3 className="text-base font-black text-blue-950 mb-3">
+        <h3 className="text-xs sm:text-sm font-black text-blue-950 mb-2 leading-5">
           {item.title}
         </h3>
 
-        <span className="text-lg font-black text-blue-800 mt-auto">
+        <span className="text-sm sm:text-base font-black text-blue-800 mt-auto">
           {Number(item.price || 0).toFixed(2)} دينار
         </span>
       </div>
 
-      <div className="p-4 bg-slate-50 border-t border-slate-100">
+      {/* زر الإضافة — أصغر */}
+      <div className="p-2 sm:p-2.5 bg-slate-50 border-t border-slate-100">
         <button
           onClick={() => {
             addToCart(
@@ -689,9 +691,9 @@ function DossierCard({
 
             alert("تمت الإضافة إلى السلة بنجاح!");
           }}
-          className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition flex items-center justify-center gap-2 shadow-sm text-sm"
+          className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg sm:rounded-xl transition flex items-center justify-center gap-1.5 shadow-sm text-[11px] sm:text-xs"
         >
-          <ShoppingCart className="w-4 h-4" />
+          <ShoppingCart className="w-3.5 h-3.5" />
           إضافة إلى السلة
         </button>
       </div>
