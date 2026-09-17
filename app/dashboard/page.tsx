@@ -20,6 +20,8 @@ import {
   Clock,
   Bell,
   X,
+  Sparkles,
+  Loader2,
 } from "lucide-react";
 
 import { supabase } from "@/lib/supabase";
@@ -91,6 +93,10 @@ export default function DashboardPage() {
 
   const [categoryType, setCategoryType] = useState<StationeryCategory>("قرطاسية");
   const [imagePreview, setImagePreview] = useState("");
+
+  // حالات تحليل الصور بالذكاء الاصطناعي
+  const [analyzingImage, setAnalyzingImage] = useState(false);
+  const [aiStatusMessage, setAiStatusMessage] = useState("");
 
   const [notification, setNotification] = useState<{ id: string; customer: string } | null>(null);
   const knownOrderIdsRef = useRef<Set<string>>(new Set());
@@ -336,13 +342,93 @@ export default function DashboardPage() {
     }
   };
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // معالجة اختيار الصورة وإتاحة تحليل الذكاء الاصطناعي
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onloadend = () => setImagePreview(reader.result as string);
+    reader.onloadend = async () => {
+      const base64Image = reader.result as string;
+      setImagePreview(base64Image);
+
+      // في حال كنا في تبويب الدوسيات، نرسل الصورة إلى الذكاء الاصطناعي لتحليلها
+      if (activeTab === "dossiers") {
+        await analyzeImageWithAI(base64Image);
+      }
+    };
     reader.readAsDataURL(file);
+  };
+
+  // وظيفة استخراج بيانات الدوسية بواسطة Gemini AI
+  const analyzeImageWithAI = async (base64Image: string) => {
+    setAnalyzingImage(true);
+    setAiStatusMessage("جاري قراءة صورة غلاف الدوسية واستخراج البيانات تلقائياً...");
+
+    try {
+      const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY || "";
+      
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [
+              {
+                parts: [
+                  {
+                    inlineData: {
+                      mimeType: "image/jpeg",
+                      data: base64Image.split(",")[1] || base64Image,
+                    },
+                  },
+                  {
+                    text: `اقرأ صورة غلاف الدوسية المرفقة واستخرج المعلومات التالية بتنسيق JSON حقيقي وفقط JSON بدون أي نصوص إضافية:
+                    {
+                      "title": "اسم الدوسية الكامل مع اسم الأستاذ إن وجد (مثال: دوسية الرياضيات - الأستاذ عمر)",
+                      "year": "الجيل المكتوب (2009 أو 2010)",
+                      "semester": "الفصل الدراسي (الأول أو الثاني)",
+                      "subject": "المادة (الرياضيات، اللغة العربية، تاريخ الأردن، التربية الإسلامية، الفيزياء، الكيمياء، الأحياء، علوم الأرض، اللغة الإنجليزية)",
+                      "dossierType": "نوع الدوسية (مادة أو مكثف أو بنك أسئلة)",
+                      "track": "المسار إن وجد (متقدم أو أعمال)"
+                    }`
+                  }
+                ]
+              }
+            ],
+            generationConfig: {
+              responseMimeType: "application/json"
+            }
+          })
+        }
+      );
+
+      const data = await response.json();
+      const textResponse = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+
+      if (textResponse) {
+        const parsedData = JSON.parse(textResponse);
+
+        if (parsedData.title) setTitle(parsedData.title);
+        if (parsedData.year && (parsedData.year === "2009" || parsedData.year === "2010")) {
+          setYear(parsedData.year);
+        }
+        if (parsedData.semester && (parsedData.semester === "الأول" || parsedData.semester === "الثاني")) {
+          setSemester(parsedData.semester);
+        }
+        if (parsedData.subject) setSubject(parsedData.subject);
+        if (parsedData.dossierType) setDossierType(parsedData.dossierType as DossierType);
+        if (parsedData.track) setTrack(parsedData.track);
+
+        setAiStatusMessage("✨ تم استخراج البيانات بنجاح! تفحص الخانات وضع السعر المناسب.");
+      }
+    } catch (err) {
+      console.error("AI Extraction Error:", err);
+      setAiStatusMessage("لم نتمكن من قراءة الصورة تلقائياً، يمكنك كتابة البيانات يدوياً.");
+    } finally {
+      setAnalyzingImage(false);
+    }
   };
 
   const handleAddItem = async (e: React.FormEvent) => {
@@ -414,6 +500,7 @@ export default function DashboardPage() {
       setTitle("");
       setPrice("");
       setImagePreview("");
+      setAiStatusMessage("");
       alert("تم حفظ المنتج ونشره بنجاح!");
     } catch (error: any) {
       console.error("UNEXPECTED INSERT ERROR:", error);
@@ -859,23 +946,18 @@ export default function DashboardPage() {
                               )}
                               <div>
                                 <p className="font-bold text-xs text-blue-950 line-clamp-1">{item.name}</p>
-                                <p className="text-xs font-black text-blue-700 mt-1">الكمية: {item.quantity} حبة</p>
-                                <p className="text-[11px] text-slate-500">السعر: {item.price} د.أ</p>
+                                <p className="text-xs font-black text-blue-600 mt-1">
+                                  {item.price} د.أ × {item.quantity}
+                                </p>
                               </div>
                             </div>
                           ))}
                         </div>
                       </div>
 
-                      <div className="flex items-center justify-between pt-3 border-t border-slate-100 text-xs font-bold text-slate-600">
-                        <div>
-                          <span>المجموع: {order.subtotal} د.أ</span>
-                          <span className="mx-2">|</span>
-                          <span>التوصيل: {order.delivery_fee} د.أ</span>
-                        </div>
-                        <div className="text-sm font-black text-blue-950">
-                          الإجمالي: {order.total} د.أ
-                        </div>
+                      <div className="border-t border-slate-100 pt-3 flex items-center justify-between text-sm font-black text-slate-800">
+                        <span>المجموع الكلي مع التوصيل:</span>
+                        <span className="text-blue-600 text-base">{order.total} د.أ</span>
                       </div>
                     </div>
                   );
@@ -884,80 +966,125 @@ export default function DashboardPage() {
             )}
           </div>
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* نموذج إضافة عنصر جديد */}
-            <div className="lg:col-span-1 bg-white border border-blue-100 rounded-3xl p-6 shadow-sm h-fit space-y-6">
-              <h3 className="text-lg font-black text-blue-950 flex items-center gap-2">
-                <PlusCircle className="w-5 h-5 text-blue-600" />
-                <span>
-                  {activeTab === "dossiers" ? "إضافة دوسية جديدة" : "إضافة قرطاسية أو ألعاب"}
-                </span>
-              </h3>
-
-              <form onSubmit={handleAddItem} className="space-y-4">
+          /* إدارة المنتجات (الدوسيات أو القرطاسية) */
+          <div className="space-y-8">
+            {/* نموذج إضافة منتج جديد */}
+            <div className="bg-white border border-blue-100 rounded-3xl p-6 md:p-8 shadow-sm">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="p-2.5 rounded-xl bg-blue-50 text-blue-600">
+                  <PlusCircle className="w-6 h-6" />
+                </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1">
-                    اسم المنتج / العنصر
+                  <h2 className="text-lg font-black text-blue-950">
+                    إضافة {activeTab === "dossiers" ? "دوسية جديدة" : "منتج قرطاسية / ألعاب"}
+                  </h2>
+                  <p className="text-xs text-slate-500">
+                    {activeTab === "dossiers"
+                      ? "ارفع صورة الغلاف وسيقوم الذكاء الاصطناعي بقراءة وتعبئة التفاصيل تلقائياً!"
+                      : "أدخل معلومات المنتج واضغط حفظ"}
+                  </p>
+                </div>
+              </div>
+
+              <form onSubmit={handleAddItem} className="space-y-5">
+                {/* رفع الصورة أولاً لتسهيل استخراج الذكاء الاصطناعي */}
+                <div className="space-y-2">
+                  <label className="text-xs font-black text-slate-700 flex items-center gap-2">
+                    <span>صورة المنتج / الغلاف</span>
+                    {activeTab === "dossiers" && (
+                      <span className="bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full text-[10px] font-bold flex items-center gap-1">
+                        <Sparkles className="w-3 h-3" /> قراءة ذكية بواسطة AI
+                      </span>
+                    )}
                   </label>
-                  <input
-                    type="text"
-                    required
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                    placeholder="مثال: دوسية الرياضيات الفصل الأول"
-                    className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-900 outline-none focus:border-blue-500"
-                  />
+                  <div className="flex items-center gap-4">
+                    <label className="flex-1 flex items-center justify-center gap-2 p-4 border-2 border-dashed border-slate-200 hover:border-blue-500 rounded-2xl cursor-pointer bg-slate-50/50 hover:bg-blue-50/30 transition">
+                      <Upload className="w-5 h-5 text-slate-400" />
+                      <span className="text-xs font-bold text-slate-600">اختر صورة من الجهاز</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleImageChange}
+                        className="hidden"
+                      />
+                    </label>
+                    {imagePreview && (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={imagePreview}
+                        alt="معاينة"
+                        className="w-16 h-16 object-cover rounded-xl border border-slate-200"
+                      />
+                    )}
+                  </div>
+
+                  {/* شريط حالة تحليل الذكاء الاصطناعي */}
+                  {analyzingImage && (
+                    <div className="p-3 bg-purple-50 border border-purple-200 rounded-xl flex items-center gap-2 text-xs text-purple-900 font-bold animate-pulse">
+                      <Loader2 className="w-4 h-4 animate-spin text-purple-600 shrink-0" />
+                      <span>{aiStatusMessage}</span>
+                    </div>
+                  )}
+
+                  {!analyzingImage && aiStatusMessage && (
+                    <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-900 font-bold">
+                      {aiStatusMessage}
+                    </div>
+                  )}
                 </div>
 
-                <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1">
-                    السعر (بالدينار الأردني)
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    required
-                    value={price}
-                    onChange={(e) => setPrice(e.target.value)}
-                    placeholder="مثال: 3.50"
-                    className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-900 outline-none focus:border-blue-500"
-                  />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs font-black text-slate-700 mb-1.5 block">
+                      اسم {activeTab === "dossiers" ? "الدوسية والأستاذ" : "المنتج"}
+                    </label>
+                    <input
+                      type="text"
+                      placeholder={
+                        activeTab === "dossiers"
+                          ? "مثال: المكثف الشامل في الرياضيات - الأستاذ عمر"
+                          : "مثال: دفتر سلك 100 ورقة"
+                      }
+                      value={title}
+                      onChange={(e) => setTitle(e.target.value)}
+                      className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-900 outline-none focus:border-blue-600"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-black text-slate-700 mb-1.5 block">السعر (دينار أردني)</label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      placeholder="مثال: 3.5"
+                      value={price}
+                      onChange={(e) => setPrice(e.target.value)}
+                      className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-900 outline-none focus:border-blue-600"
+                    />
+                  </div>
                 </div>
 
+                {/* خيارات الدوسيات */}
                 {activeTab === "dossiers" ? (
-                  <>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-xs font-bold text-slate-600 mb-1">الجيل</label>
-                        <select
-                          value={year}
-                          onChange={(e) => setYear(e.target.value)}
-                          className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-900 outline-none focus:border-blue-500"
-                        >
-                          <option value="2009">2009</option>
-                          <option value="2010">2010</option>
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-bold text-slate-600 mb-1">الفصل</label>
-                        <select
-                          value={semester}
-                          onChange={(e) => setSemester(e.target.value)}
-                          className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-900 outline-none focus:border-blue-500"
-                        >
-                          <option value="الأول">الأول</option>
-                          <option value="الثاني">الثاني</option>
-                        </select>
-                      </div>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-2">
+                    <div>
+                      <label className="text-xs font-black text-slate-700 mb-1.5 block">الجيل</label>
+                      <select
+                        value={year}
+                        onChange={(e) => setYear(e.target.value)}
+                        className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-900 outline-none focus:border-blue-600"
+                      >
+                        <option value="2010">جيل 2010</option>
+                        <option value="2009">جيل 2009</option>
+                      </select>
                     </div>
 
                     <div>
-                      <label className="block text-xs font-bold text-slate-600 mb-1">المادة</label>
+                      <label className="text-xs font-black text-slate-700 mb-1.5 block">المادة</label>
                       <select
                         value={subject}
                         onChange={(e) => setSubject(e.target.value)}
-                        className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-900 outline-none focus:border-blue-500"
+                        className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-900 outline-none focus:border-blue-600"
                       >
                         {(year === "2010" ? SUBJECTS_2010 : SUBJECTS_2009).map((sub) => (
                           <option key={sub} value={sub}>
@@ -967,128 +1094,125 @@ export default function DashboardPage() {
                       </select>
                     </div>
 
-                    {year === "2009" && (subject.includes("الرياضيات") || subject.includes("اللغة الإنجليزية") || subject.includes("رياضيات") || subject.includes("إنجليزي")) && (
-                      <div>
-                        <label className="block text-xs font-bold text-slate-600 mb-1">المسار</label>
-                        <select
-                          value={track}
-                          onChange={(e) => setTrack(e.target.value)}
-                          className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-900 outline-none focus:border-blue-500"
-                        >
-                          <option value="متقدم">متقدم</option>
-                          <option value="أعمال">أعمال</option>
-                        </select>
-                      </div>
-                    )}
+                    <div>
+                      <label className="text-xs font-black text-slate-700 mb-1.5 block">الفصل</label>
+                      <select
+                        value={semester}
+                        onChange={(e) => setSemester(e.target.value)}
+                        className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-900 outline-none focus:border-blue-600"
+                      >
+                        <option value="الأول">الفصل الأول</option>
+                        <option value="الثاني">الفصل الثاني</option>
+                      </select>
+                    </div>
 
                     <div>
-                      <label className="block text-xs font-bold text-slate-600 mb-1">نوع الدوسية</label>
+                      <label className="text-xs font-black text-slate-700 mb-1.5 block">نوع الدوسية</label>
                       <select
                         value={dossierType}
                         onChange={(e) => setDossierType(e.target.value as DossierType)}
-                        className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-900 outline-none focus:border-blue-500"
+                        className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-900 outline-none focus:border-blue-600"
                       >
-                        <option value="مادة">مادة</option>
+                        <option value="مادة">دوسية مادة</option>
                         <option value="مكثف">مكثف</option>
                         <option value="بنك أسئلة">بنك أسئلة</option>
                       </select>
                     </div>
-                  </>
+
+                    {year === "2009" &&
+                      (subject === "الرياضيات" || subject === "اللغة الإنجليزية") && (
+                        <div>
+                          <label className="text-xs font-black text-slate-700 mb-1.5 block">المسار</label>
+                          <select
+                            value={track}
+                            onChange={(e) => setTrack(e.target.value)}
+                            className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-900 outline-none focus:border-blue-600"
+                          >
+                            <option value="متقدم">متقدم</option>
+                            <option value="أعمال">أعمال</option>
+                          </select>
+                        </div>
+                      )}
+                  </div>
                 ) : (
-                  <div>
-                    <label className="block text-xs font-bold text-slate-600 mb-1">التصنيف</label>
+                  /* خيارات القرطاسية والألعاب */
+                  <div className="pt-2">
+                    <label className="text-xs font-black text-slate-700 mb-1.5 block">القسم</label>
                     <select
                       value={categoryType}
                       onChange={(e) => setCategoryType(e.target.value as StationeryCategory)}
-                      className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-900 outline-none focus:border-blue-500"
+                      className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-900 outline-none focus:border-blue-600 max-w-md"
                     >
                       <option value="قرطاسية">قرطاسية</option>
-                      <option value="أدوات">أدوات</option>
-                      <option value="ألعاب">ألعاب</option>
+                      <option value="أدوات">أدوات مكتبية ومدرسية</option>
+                      <option value="ألعاب">ألعاب وهدايا</option>
                     </select>
                   </div>
                 )}
 
-                <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1">صورة المنتج</label>
-                  <label className="flex items-center justify-center gap-2 p-3 bg-slate-50 border border-dashed border-slate-300 rounded-xl cursor-pointer hover:bg-slate-100 transition text-xs font-bold text-slate-600">
-                    <Upload className="w-4 h-4 text-slate-500" />
-                    <span>{imagePreview ? "تغيير الصورة" : "رفع صورة"}</span>
-                    <input type="file" accept="image/*" onChange={handleImageChange} className="hidden" />
-                  </label>
-                  {imagePreview && (
-                    <div className="mt-2 relative w-full h-32 rounded-xl overflow-hidden border border-slate-200">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={imagePreview} alt="معاينة" className="w-full h-full object-cover" />
-                    </div>
-                  )}
-                </div>
-
                 <button
                   type="submit"
-                  disabled={loadingProducts}
-                  className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition shadow-sm disabled:opacity-50"
+                  disabled={loadingProducts || analyzingImage}
+                  className="w-full py-4 bg-blue-600 hover:bg-blue-700 text-white font-black rounded-2xl transition shadow-md hover:shadow-lg disabled:opacity-50 flex items-center justify-center gap-2"
                 >
-                  {loadingProducts ? "جاري الحفظ..." : "إضافة وحفظ"}
+                  {loadingProducts ? (
+                    <span>جاري حفظ المنتج...</span>
+                  ) : (
+                    <>
+                      <PlusCircle className="w-5 h-5" />
+                      <span>حفظ ونشر المنتج</span>
+                    </>
+                  )}
                 </button>
               </form>
             </div>
 
-            {/* قائمة المنتجات المعروضة */}
-            <div className="lg:col-span-2 space-y-4">
+            {/* قائمة المنتجات المضافة */}
+            <div className="space-y-4">
               <h3 className="text-lg font-black text-blue-950">
-                {activeTab === "dossiers"
-                  ? `قائمة الدوسيات (${filteredDossiers.length})`
-                  : `قائمة المنتجات (${filteredStationery.length})`}
+                المنتجات الحالية ({activeTab === "dossiers" ? filteredDossiers.length : filteredStationery.length})
               </h3>
 
               {(activeTab === "dossiers" ? filteredDossiers : filteredStationery).length === 0 ? (
-                <div className="bg-white border border-blue-100 rounded-3xl p-12 text-center shadow-sm">
-                  <ShoppingBag className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-                  <h3 className="text-lg font-bold text-slate-600">
-                    {searchQuery ? "لا توجد نتائج مطابقة" : "لا توجد منتجات مضافة حالياً"}
-                  </h3>
+                <div className="bg-white border border-blue-100 rounded-3xl p-8 text-center text-slate-400 font-bold">
+                  لا توجد منتجات مضافة في هذا القسم حالياً.
                 </div>
               ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {(activeTab === "dossiers" ? filteredDossiers : filteredStationery).map((item) => (
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                  {(activeTab === "dossiers" ? filteredDossiers : filteredStationery).map((item: any) => (
                     <div
                       key={item.id}
-                      className="bg-white border border-slate-100 rounded-2xl p-4 shadow-sm flex gap-4 items-center justify-between"
+                      className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm flex items-center justify-between gap-3 hover:border-blue-300 transition"
                     >
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-3 min-w-0">
                         {item.image ? (
                           // eslint-disable-next-line @next/next/no-img-element
                           <img
                             src={item.image}
                             alt={item.title}
-                            className="w-16 h-16 object-cover rounded-xl border border-slate-100 shrink-0"
+                            className="w-14 h-14 object-cover rounded-xl border border-slate-100 shrink-0"
                           />
                         ) : (
-                          <div className="w-16 h-16 rounded-xl bg-slate-100 flex items-center justify-center shrink-0">
-                            {activeTab === "dossiers" ? (
-                              <BookOpen className="w-6 h-6 text-slate-400" />
-                            ) : (
-                              <ShoppingBag className="w-6 h-6 text-slate-400" />
-                            )}
+                          <div className="w-14 h-14 rounded-xl bg-slate-100 flex items-center justify-center shrink-0 text-slate-400">
+                            {activeTab === "dossiers" ? <BookOpen /> : <ShoppingBag />}
                           </div>
                         )}
-                        <div>
-                          <h4 className="font-bold text-sm text-blue-950 line-clamp-1">{item.title}</h4>
-                          <p className="text-xs font-black text-blue-600 mt-1">{item.price} د.أ</p>
-                          {activeTab === "dossiers" ? (
-                            <p className="text-[11px] text-slate-500 mt-0.5">
-                              جيل {item.year} - {item.subject} ({item.dossier_type})
-                            </p>
-                          ) : (
-                            <p className="text-[11px] text-slate-500 mt-0.5">{item.category}</p>
+                        <div className="min-w-0">
+                          <h4 className="font-black text-sm text-blue-950 truncate">{item.title}</h4>
+                          <p className="text-xs text-slate-500 mt-0.5">
+                            {item.price} د.أ {item.year ? `• جيل ${item.year}` : ""}
+                          </p>
+                          {item.subject && (
+                            <span className="inline-block bg-blue-50 text-blue-700 text-[10px] font-bold px-2 py-0.5 rounded-md mt-1">
+                              {item.subject}
+                            </span>
                           )}
                         </div>
                       </div>
 
                       <button
                         onClick={() => handleDelete(item.id, activeTab as "dossiers" | "stationery")}
-                        className="p-2.5 text-rose-500 hover:bg-rose-50 rounded-xl border border-rose-100 transition shrink-0"
+                        className="p-2 text-rose-500 hover:bg-rose-50 rounded-xl border border-rose-100 transition shrink-0"
                         title="حذف المنتج"
                       >
                         <Trash2 className="w-4 h-4" />
