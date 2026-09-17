@@ -342,7 +342,6 @@ export default function DashboardPage() {
     }
   };
 
-  // معالجة اختيار الصورة وإتاحة تحليل الذكاء الاصطناعي
   const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -352,7 +351,6 @@ export default function DashboardPage() {
       const base64Image = reader.result as string;
       setImagePreview(base64Image);
 
-      // في حال كنا في تبويب الدوسيات، نرسل الصورة إلى الذكاء الاصطناعي لتحليلها
       if (activeTab === "dossiers") {
         await analyzeImageWithAI(base64Image);
       }
@@ -360,14 +358,39 @@ export default function DashboardPage() {
     reader.readAsDataURL(file);
   };
 
-  // وظيفة استخراج بيانات الدوسية بواسطة Gemini AI
+  // دالة التحليل بالذكاء الاصطناعي المحدثة
   const analyzeImageWithAI = async (base64Image: string) => {
     setAnalyzingImage(true);
     setAiStatusMessage("جاري قراءة صورة غلاف الدوسية واستخراج البيانات تلقائياً...");
 
     try {
       const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY || "";
-      
+
+      if (!apiKey) {
+        setAiStatusMessage("⚠️ لم يتم العثور على مفتاح API! ضعه في ملف .env.local باسم NEXT_PUBLIC_GEMINI_API_KEY");
+        setAnalyzingImage(false);
+        return;
+      }
+
+      const mimeTypeMatch = base64Image.match(/^data:(image\/\w+);base64,/);
+      const mimeType = mimeTypeMatch ? mimeTypeMatch[1] : "image/jpeg";
+      const cleanBase64 = base64Image.replace(/^data:image\/\w+;base64,/, "");
+
+      const promptText = `
+أنت خبير قراءة نصوص وتعرف ضوئي (OCR) مخصص لغلاف الدوسيات والكتب التعليمية التوجيهية بالأردن.
+اقرأ كافة النصوص الموجودة على صورة غلاف الدوسية بدقة واكتشف تفاصيل الدوسية.
+
+قم بإنشاء واستخراج البيانات بتنسيق JSON فقط بدون أي مقدمات أو شروحات:
+{
+  "title": "اكتب الاسم الكامل المكتوب على الغلاف مع اسم الأستاذ إن وجد (مثال: الشامل في الرياضيات - الأستاذ عمر)",
+  "year": "حدد الجيل بدقة (2009 أو 2010)",
+  "semester": "حدد الفصل (الأول أو الثاني)",
+  "subject": "حدد المادة بدقة من التالية: الرياضيات، اللغة العربية، تاريخ الأردن، التربية الإسلامية، الفيزياء، الكيمياء، الأحياء، علوم الأرض، اللغة الإنجليزية",
+  "dossierType": "نوع الدوسية من النمط: مادة أو مكثف أو بنك أسئلة",
+  "track": "حدد المسار إذا كُتب: متقدم أو أعمال"
+}
+`;
+
       const response = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
         {
@@ -379,30 +402,28 @@ export default function DashboardPage() {
                 parts: [
                   {
                     inlineData: {
-                      mimeType: "image/jpeg",
-                      data: base64Image.split(",")[1] || base64Image,
+                      mimeType: mimeType,
+                      data: cleanBase64,
                     },
                   },
                   {
-                    text: `اقرأ صورة غلاف الدوسية المرفقة واستخرج المعلومات التالية بتنسيق JSON حقيقي وفقط JSON بدون أي نصوص إضافية:
-                    {
-                      "title": "اسم الدوسية الكامل مع اسم الأستاذ إن وجد (مثال: دوسية الرياضيات - الأستاذ عمر)",
-                      "year": "الجيل المكتوب (2009 أو 2010)",
-                      "semester": "الفصل الدراسي (الأول أو الثاني)",
-                      "subject": "المادة (الرياضيات، اللغة العربية، تاريخ الأردن، التربية الإسلامية، الفيزياء، الكيمياء، الأحياء، علوم الأرض، اللغة الإنجليزية)",
-                      "dossierType": "نوع الدوسية (مادة أو مكثف أو بنك أسئلة)",
-                      "track": "المسار إن وجد (متقدم أو أعمال)"
-                    }`
-                  }
-                ]
-              }
+                    text: promptText,
+                  },
+                ],
+              },
             ],
             generationConfig: {
-              responseMimeType: "application/json"
-            }
-          })
+              responseMimeType: "application/json",
+              temperature: 0.1,
+            },
+          }),
         }
       );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error?.message || "فشل الاتصال بخدمة الذكاء الاصطناعي");
+      }
 
       const data = await response.json();
       const textResponse = data?.candidates?.[0]?.content?.parts?.[0]?.text;
@@ -421,11 +442,13 @@ export default function DashboardPage() {
         if (parsedData.dossierType) setDossierType(parsedData.dossierType as DossierType);
         if (parsedData.track) setTrack(parsedData.track);
 
-        setAiStatusMessage("✨ تم استخراج البيانات بنجاح! تفحص الخانات وضع السعر المناسب.");
+        setAiStatusMessage("✨ تم استخراج كافة البيانات بنجاح! راجع البيانات وأدخل السعر.");
+      } else {
+        setAiStatusMessage("لم يتم العثور على نصوص واضحة، يرجى كتابة التفاصيل يدوياً.");
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("AI Extraction Error:", err);
-      setAiStatusMessage("لم نتمكن من قراءة الصورة تلقائياً، يمكنك كتابة البيانات يدوياً.");
+      setAiStatusMessage(`حدث خطأ أثناء القراءة: ${err.message || "تأكد من إعداد المفتاح وجودة الصورة"}`);
     } finally {
       setAnalyzingImage(false);
     }
@@ -987,7 +1010,6 @@ export default function DashboardPage() {
               </div>
 
               <form onSubmit={handleAddItem} className="space-y-5">
-                {/* رفع الصورة أولاً لتسهيل استخراج الذكاء الاصطناعي */}
                 <div className="space-y-2">
                   <label className="text-xs font-black text-slate-700 flex items-center gap-2">
                     <span>صورة المنتج / الغلاف</span>
@@ -1018,7 +1040,6 @@ export default function DashboardPage() {
                     )}
                   </div>
 
-                  {/* شريط حالة تحليل الذكاء الاصطناعي */}
                   {analyzingImage && (
                     <div className="p-3 bg-purple-50 border border-purple-200 rounded-xl flex items-center gap-2 text-xs text-purple-900 font-bold animate-pulse">
                       <Loader2 className="w-4 h-4 animate-spin text-purple-600 shrink-0" />
@@ -1064,7 +1085,6 @@ export default function DashboardPage() {
                   </div>
                 </div>
 
-                {/* خيارات الدوسيات */}
                 {activeTab === "dossiers" ? (
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-2">
                     <div>
@@ -1135,7 +1155,6 @@ export default function DashboardPage() {
                       )}
                   </div>
                 ) : (
-                  /* خيارات القرطاسية والألعاب */
                   <div className="pt-2">
                     <label className="text-xs font-black text-slate-700 mb-1.5 block">القسم</label>
                     <select
@@ -1167,7 +1186,7 @@ export default function DashboardPage() {
               </form>
             </div>
 
-            {/* قائمة المنتجات المضافة */}
+            {/* قائمة المنتجات الحالية */}
             <div className="space-y-4">
               <h3 className="text-lg font-black text-blue-950">
                 المنتجات الحالية ({activeTab === "dossiers" ? filteredDossiers.length : filteredStationery.length})
