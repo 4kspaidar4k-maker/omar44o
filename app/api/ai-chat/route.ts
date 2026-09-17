@@ -1,156 +1,594 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
-// مفتاح الذكاء الاصطناعي Gemini
+/* =========================================================
+   إعدادات
+========================================================= */
+
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 
-// بيانات قاعدة بيانات Supabase (مع التأكد من وجود المفتاح الإفتراضي)
+const GEMINI_MODEL =
+  process.env.GEMINI_MODEL || "gemini-2.5-flash";
+
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
+
+/*
+  على السيرفر نفضل Service Role إذا كان موجوداً.
+  وإذا لم يكن موجوداً نستخدم ANON KEY.
+*/
 const SUPABASE_KEY =
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
   process.env.SUPABASE_SERVICE_ROLE_KEY ||
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
   "";
+
+/* =========================================================
+   أنواع البيانات
+========================================================= */
+
+type ChatMessage = {
+  role: "user" | "assistant" | "model";
+  content: string;
+};
+
+type Product = {
+  id: string | number;
+  title?: string | null;
+  name?: string | null;
+  price?: number | string | null;
+  image?: string | null;
+  category?: string | null;
+  subject?: string | null;
+  year?: string | number | null;
+  semester?: string | null;
+  dossier_type?: string | null;
+};
+
+/* =========================================================
+   تنظيف النص
+========================================================= */
+
+function cleanText(value: unknown): string {
+  return String(value ?? "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/* =========================================================
+   تجهيز المنتج للـ AI
+========================================================= */
+
+function productToText(product: Product): string {
+  const title = cleanText(product.title || product.name || "بدون اسم");
+
+  const parts = [
+    `ID: ${product.id}`,
+    `الاسم: ${title}`,
+    `السعر: ${
+      product.price !== null &&
+      product.price !== undefined &&
+      product.price !== ""
+        ? `${product.price} د.أ`
+        : "غير محدد"
+    }`,
+    `الصورة: ${cleanText(product.image)}`,
+    `القسم: ${cleanText(product.category || "عام")}`,
+  ];
+
+  if (product.subject) {
+    parts.push(`المادة: ${cleanText(product.subject)}`);
+  }
+
+  if (product.year !== null && product.year !== undefined) {
+    parts.push(`الجيل: ${cleanText(product.year)}`);
+  }
+
+  if (product.semester) {
+    parts.push(`الفصل: ${cleanText(product.semester)}`);
+  }
+
+  if (product.dossier_type) {
+    parts.push(`النوع: ${cleanText(product.dossier_type)}`);
+  }
+
+  return parts.join(" | ");
+}
+
+/* =========================================================
+   المنتج النهائي الذي نرسله للواجهة
+========================================================= */
+
+function productForClient(product: Product) {
+  return {
+    id: String(product.id),
+    title: cleanText(product.title || product.name || "بدون اسم"),
+    price: Number(product.price || 0),
+    image: cleanText(product.image),
+  };
+}
+
+/* =========================================================
+   استخراج ID المنتج من رد Gemini
+========================================================= */
+
+function extractProductId(text: string) {
+  const regex =
+    /<<<PRODUCT_ID>>>\s*([\s\S]*?)\s*<<<END_PRODUCT_ID>>>/i;
+
+  const match = text.match(regex);
+
+  if (!match?.[1]) {
+    return {
+      productId: null,
+      cleanReply: text.trim(),
+    };
+  }
+
+  const productId = match[1].trim();
+
+  const cleanReply = text
+    .replace(regex, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+
+  return {
+    productId,
+    cleanReply,
+  };
+}
+
+/* =========================================================
+   POST
+========================================================= */
 
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
-    const { messages } = body;
+    /* -------------------------------------------------------
+       1. قراءة الطلب
+    ------------------------------------------------------- */
 
-    if (!messages || !Array.isArray(messages) || messages.length === 0) {
+    const body = await req.json();
+
+    const messages = body?.messages as ChatMessage[];
+
+    if (!Array.isArray(messages) || messages.length === 0) {
       return NextResponse.json(
-        { error: "الرسائل غير صحيحة أو غير متوفرة." },
+        {
+          error: "الرسائل غير صحيحة أو غير متوفرة.",
+        },
         { status: 400 }
       );
     }
 
+    /* -------------------------------------------------------
+       2. التحقق من المفاتيح
+    ------------------------------------------------------- */
+
     if (!GEMINI_API_KEY) {
       console.error("Missing GEMINI_API_KEY");
+
       return NextResponse.json(
-        { error: "مفتاح GEMINI_API_KEY غير معرف في ملف .env.local" },
+        {
+          error:
+            "مفتاح GEMINI_API_KEY غير موجود في .env.local",
+        },
         { status: 500 }
       );
     }
 
-    // 1. الاتصال بقاعدة البيانات وجلب المنتجات
-    let storeProductsText = "لا توجد أي منتجات مضافة في المتجر حالياً.";
+    if (!SUPABASE_URL || !SUPABASE_KEY) {
+      console.error("Missing Supabase credentials");
 
-    if (SUPABASE_URL && SUPABASE_KEY) {
-      try {
-        const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
-        const { data: productsData, error: dbError } = await supabase
-          .from("products")
-          .select("*")
-          .order("created_at", { ascending: false });
-
-        if (dbError) {
-          console.error("Supabase DB Error:", dbError.message);
-        } else if (productsData && productsData.length > 0) {
-          storeProductsText = productsData
-            .map((p) => {
-              const details = [
-                `ID: ${p.id}`,
-                `الاسم: ${p.title || p.name || "بدون اسم"}`,
-                `السعر: ${
-                  p.price !== null && p.price !== undefined
-                    ? `${p.price} د.أ`
-                    : "غير محدد"
-                }`,
-                `الصورة: ${p.image || ""}`,
-                `القسم: ${p.category || "عام"}`,
-              ];
-              if (p.subject) details.push(`المادة: ${p.subject}`);
-              if (p.year) details.push(`الجيل: ${p.year}`);
-              if (p.semester) details.push(`الفصل: ${p.semester}`);
-              if (p.dossier_type) details.push(`النوع: ${p.dossier_type}`);
-              return details.join(" | ");
-            })
-            .join("\n");
-        }
-      } catch (e) {
-        console.error("Supabase Connection Exception:", e);
-      }
-    } else {
-      console.warn("Supabase credentials missing or incomplete.");
+      return NextResponse.json(
+        {
+          error:
+            "إعدادات Supabase غير موجودة في متغيرات البيئة.",
+        },
+        { status: 500 }
+      );
     }
 
-    // 2. تجهيز سجل المحادثة بالشكل الصحيح
-    const formattedMessages = messages.map(
-      (m: { role: string; content: string }) => ({
-        role: m.role === "assistant" || m.role === "model" ? "model" : "user",
-        parts: [{ text: m.content }],
-      })
+    /* -------------------------------------------------------
+       3. الاتصال بـ Supabase
+    ------------------------------------------------------- */
+
+    const supabase = createClient(
+      SUPABASE_URL,
+      SUPABASE_KEY
     );
 
-    // 3. إرسال الطلب إلى نموذج Gemini 2.0 Flash
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
+    const {
+      data: productsData,
+      error: dbError,
+    } = await supabase
+      .from("products")
+      .select(
+        "id,title,name,price,image,category,subject,year,semester,dossier_type"
+      )
+      .order("created_at", {
+        ascending: false,
+      });
+
+    if (dbError) {
+      console.error(
+        "Supabase DB Error:",
+        dbError.message
+      );
+
+      return NextResponse.json(
+        {
+          error:
+            "تعذر الوصول إلى منتجات المكتبة حالياً.",
+        },
+        { status: 500 }
+      );
+    }
+
+    const products: Product[] = productsData || [];
+
+    /* -------------------------------------------------------
+       4. إنشاء كتالوج المنتجات للـ AI
+    ------------------------------------------------------- */
+
+    const storeProductsText =
+      products.length > 0
+        ? products.map(productToText).join("\n")
+        : "لا توجد منتجات متوفرة حالياً.";
+
+    /* -------------------------------------------------------
+       5. تجهيز المحادثة
+    ------------------------------------------------------- */
+
+    /*
+      نحتفظ بآخر 20 رسالة حتى لا تكبر الـ request
+      بشكل غير ضروري.
+    */
+    const recentMessages = messages.slice(-20);
+
+    const formattedMessages = recentMessages
+      .map((message) => {
+        const role =
+          message.role === "assistant" ||
+          message.role === "model"
+            ? "model"
+            : "user";
+
+        return {
+          role,
+          parts: [
+            {
+              text: cleanText(message.content),
+            },
+          ],
+        };
+      })
+      .filter(
+        (message) =>
+          message.parts[0].text.length > 0
+      );
+
+    /* -------------------------------------------------------
+       6. تعليمات المساعد
+    ------------------------------------------------------- */
+
+    const systemPrompt = `
+أنت مساعد المبيعات الخاص بـ "مكتبة أبو طوق" في الأردن.
+
+شخصيتك:
+- احكي باللهجة الأردنية الطبيعية.
+- كن لطيفاً ومحترماً.
+- رد باختصار.
+- لا تكثر كلام.
+- لا تستخدم لغة رسمية ثقيلة.
+- لا تدّعي أنك إنسان.
+- لا تخترع أي منتج أو سعر أو معلومة غير موجودة في كتالوج المكتبة.
+
+مثال أسلوب:
+"هلا والله 👋"
+"آه موجودة."
+"أكيد، هاي متوفرة."
+"لا والله يا غالي، مش متوفرة حالياً."
+
+==================================================
+قواعد المنتجات
+==================================================
+
+الكتالوج الموجود أسفل هذه التعليمات هو المصدر الوحيد للمنتجات.
+
+إذا سأل الزبون عن:
+- دوسية
+- مادة
+- جيل
+- فصل
+- مكثف
+- بنك أسئلة
+- بطاقة
+- قرطاسية
+- أو أي منتج
+
+ابحث داخل الكتالوج.
+
+مهم جداً:
+لا تخترع منتجاً.
+لا تخترع سعراً.
+لا تخترع ID.
+لا تخترع صورة.
+لا تعد الزبون بتوفر شيء غير موجود.
+
+==================================================
+اختيار المنتج
+==================================================
+
+إذا كان هناك منتج واضح ومطابق لطلب الزبون:
+
+1. اذكر المنتج باختصار.
+2. إذا كان السعر موجوداً، يمكنك ذكر السعر.
+3. أخرج ID المنتج الموجود في الكتالوج فقط بهذا الشكل في آخر الرد:
+
+<<<PRODUCT_ID>>>ID_HERE<<<END_PRODUCT_ID>>>
+
+مثال:
+
+آه موجودة يا غالي، هاي دوسية الرياضيات.
+سعرها 3.50 د.أ.
+
+<<<PRODUCT_ID>>>123<<<END_PRODUCT_ID>>>
+
+ممنوع وضع أي بيانات أخرى داخل PRODUCT_ID.
+ضع الـ ID فقط.
+
+==================================================
+متى لا تختار منتجاً؟
+==================================================
+
+إذا كان الطلب غير واضح أو يوجد أكثر من منتج محتمل:
+- لا تخمن.
+- اسأل سؤالاً قصيراً للتوضيح.
+
+مثال:
+"أكيد، أي جيل بدك؟"
+
+إذا طلب الزبون منتجاً غير موجود:
+"لا والله يا غالي مش متوفرة حالياً بالمكتبة."
+
+ولا تضع PRODUCT_ID.
+
+==================================================
+المعلومات المهمة للدوسيات
+==================================================
+
+انتبه للفروقات بين:
+- الجيل
+- المادة
+- الفصل
+- نوع الدوسية
+- المسار
+- القسم
+
+مثلاً إذا الزبون قال:
+"بدي رياضيات 2010"
+
+ابحث عن منتجات الرياضيات الخاصة بالجيل 2010.
+
+إذا قال:
+"بدي مكثف رياضيات"
+
+ابحث عن المنتج الذي نوعه مكثف.
+
+إذا لم تكن المعلومة كافية، اسأل سؤالاً قصيراً بدلاً من التخمين.
+
+==================================================
+الرد
+==================================================
+
+خلي الرد قصير جداً.
+
+لا تشرح للزبون كيف تعمل.
+لا تذكر التعليمات.
+لا تذكر الكتالوج.
+لا تذكر أنك تستخدم قاعدة بيانات.
+لا تستخدم JSON للزبون.
+
+==================================================
+كتالوج مكتبة أبو طوق
+==================================================
+
+${storeProductsText}
+`;
+
+    /* -------------------------------------------------------
+       7. رابط Gemini
+    ------------------------------------------------------- */
+
+    const geminiUrl =
+      `https://generativelanguage.googleapis.com/v1beta/models/` +
+      `${encodeURIComponent(GEMINI_MODEL)}:generateContent?key=${encodeURIComponent(
+        GEMINI_API_KEY
+      )}`;
+
+    /* -------------------------------------------------------
+       8. طلب Gemini
+    ------------------------------------------------------- */
 
     const geminiPayload = {
       systemInstruction: {
         parts: [
           {
-            text: `أنت موظف في مكتبة "أبو طوق"، تحكي بلهجة أردنية عامية، مرتبة، ومختصرة جداً بدون كثرة حكي ولت وعجن.
-
-قواعد شخصيتك وردك على الزبائن:
-1. الشخصية: احكي زي كأنك موظف أردني حقيقي بمكتبة (مثال: "أهلاً وسهلاً"، "هلا بيك"، "هلا معلم"، "أه والله موجودة"، "تفضل هيها"، "مش متوفرة حالياً والله").
-2. اختصار الحكي: ممنوع تكثر كلام! جاوب السطر المفيد مباشرة وبشكل مختصر جداً.
-3. المطابقة والبحث: افهم شو ما كتب الزبون ("دوسيه"، "بطاقة"، "عمر"، "مكثف") وقارن الاسم بالقائمة.
-4. إرفاق كرت المنتج: إذا لقيت المنتج المطلوب، جاوبه بسطرين قصار وأرفق كائن الـ JSON الخاص بالمنتج بآخر كلامك بالضبط بهاي الصيغة:
-   <<<PRODUCT_DATA>>>{"id": "...", "title": "...", "price": 0, "image": "..."}<<<END_PRODUCT_DATA>>>
-5. غير متوفر: إذا طلب شيء مش موجود أبداً، احكيله بوضوح وبدون زيادة حكي: "لا والله يا غالي مش متوفرة حالياً بالمكتبة."
-6. ممنوع تأليف أسعار أو دوسيات من عندك، اعتمد فقط على قائمة المكتبة المرفقة أدناه.
-
-قائمة متجر مكتبة أبو طوق الحالية:
-${storeProductsText}`,
+            text: systemPrompt,
           },
         ],
       },
+
       contents: formattedMessages,
+
+      generationConfig: {
+        temperature: 0.2,
+        topP: 0.8,
+        maxOutputTokens: 500,
+      },
     };
 
     const response = await fetch(geminiUrl, {
       method: "POST",
+
       headers: {
         "Content-Type": "application/json",
       },
+
       body: JSON.stringify(geminiPayload),
+
+      cache: "no-store",
     });
 
-    const data = await response.json();
+    /* -------------------------------------------------------
+       9. قراءة رد Gemini بأمان
+    ------------------------------------------------------- */
 
-    if (!response.ok) {
-      console.error("Gemini API Error Detail:", JSON.stringify(data));
+    let data: any = null;
+
+    try {
+      data = await response.json();
+    } catch {
+      console.error(
+        "Gemini returned invalid JSON"
+      );
+
       return NextResponse.json(
-        { error: data?.error?.message || "خطأ في الاتصال بنموذج الذكاء الاصطناعي" },
-        { status: response.status }
+        {
+          error:
+            "وصل رد غير مفهوم من خدمة الذكاء الاصطناعي.",
+        },
+        { status: 502 }
       );
     }
 
-    const fullReply =
-      data?.candidates?.[0]?.content?.parts?.[0]?.text ||
-      "أهلاً وسهلاً بيك، كيف بقدر أساعدك؟";
+    if (!response.ok) {
+      console.error(
+        "Gemini API Error:",
+        JSON.stringify(data, null, 2)
+      );
 
-    // 4. استخراج بطاقة المنتج إن وُجدت
+      return NextResponse.json(
+        {
+          error:
+            data?.error?.message ||
+            "حدث خطأ أثناء الاتصال بالذكاء الاصطناعي.",
+        },
+        {
+          status: response.status,
+        }
+      );
+    }
+
+    /* -------------------------------------------------------
+       10. استخراج النص
+    ------------------------------------------------------- */
+
+    const parts =
+      data?.candidates?.[0]?.content?.parts || [];
+
+    const fullReply = parts
+      .map((part: any) => part?.text || "")
+      .join("")
+      .trim();
+
+    if (!fullReply) {
+      console.error(
+        "Gemini returned empty response:",
+        JSON.stringify(data, null, 2)
+      );
+
+      return NextResponse.json(
+        {
+          reply:
+            "هلا والله 👋 احكيلي شو المنتج اللي بتدور عليه.",
+          product: null,
+        },
+        { status: 200 }
+      );
+    }
+
+    /* -------------------------------------------------------
+       11. استخراج ID المنتج
+    ------------------------------------------------------- */
+
+    const {
+      productId,
+      cleanReply: rawCleanReply,
+    } = extractProductId(fullReply);
+
+    let cleanReply = rawCleanReply;
+
+    /* -------------------------------------------------------
+       12. التحقق من المنتج من قاعدة البيانات
+    ------------------------------------------------------- */
+
     let productData = null;
-    let cleanReply = fullReply;
 
-    const regexPattern = /<<<PRODUCT_DATA>>>([\s\S]*?)<<<END_PRODUCT_DATA>>>/;
-    const match = fullReply.match(regexPattern);
+    if (productId) {
+      const foundProduct = products.find(
+        (product) =>
+          String(product.id).trim() ===
+          String(productId).trim()
+      );
 
-    if (match && match[1]) {
-      try {
-        productData = JSON.parse(match[1].trim());
-        cleanReply = fullReply.replace(regexPattern, "").trim();
-      } catch (e) {
-        console.error("خطأ في تحليل JSON للمنتج:", e);
+      if (foundProduct) {
+        /*
+          مهم:
+          لا نأخذ السعر والصورة والعنوان من Gemini.
+          نأخذهم مباشرة من Supabase.
+        */
+        productData =
+          productForClient(foundProduct);
+      } else {
+        console.warn(
+          "Gemini selected an invalid product ID:",
+          productId
+        );
       }
     }
 
-    return NextResponse.json({ reply: cleanReply, product: productData });
-  } catch (error: any) {
-    console.error("Server Route Error:", error);
+    /* -------------------------------------------------------
+       13. تنظيف أي علامات متبقية
+    ------------------------------------------------------- */
+
+    cleanReply = cleanReply
+      .replace(
+        /<<<PRODUCT_ID>>>[\s\S]*?<<<END_PRODUCT_ID>>>/gi,
+        ""
+      )
+      .trim();
+
+    /* -------------------------------------------------------
+       14. الرد النهائي
+    ------------------------------------------------------- */
+
     return NextResponse.json(
-      { error: error?.message || "حدث خطأ غير متوقع في السيرفر" },
-      { status: 500 }
+      {
+        reply:
+          cleanReply ||
+          "هلا والله 👋 كيف بقدر أساعدك؟",
+
+        product: productData,
+      },
+      {
+        status: 200,
+      }
+    );
+  } catch (error: any) {
+    console.error(
+      "AI CHAT SERVER ERROR:",
+      error
+    );
+
+    return NextResponse.json(
+      {
+        error:
+          error?.message ||
+          "حدث خطأ غير متوقع في السيرفر.",
+      },
+      {
+        status: 500,
+      }
     );
   }
 }
